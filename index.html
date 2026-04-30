@@ -187,7 +187,7 @@
       },
       set(key, value) {
         try { localStorage.setItem(key, String(value)); }
-        catch { /* Ignore private-mode storage failures. */ }
+        catch { }
       }
     };
 
@@ -276,7 +276,6 @@
     }
 
     function makeEnemy() {
-      const names = ["Bone Warden", "Mirror Witch", "Ash Bishop", "Slime Curator", "Rune Duelist"];
       const colors = [C.purple, C.pink, C.green, C.gold, C.blue];
       const hp = 4 + Math.floor(state.room * 1.35);
       return makePaddle(W - 48, H / 2, pick(colors), hp, 92 + state.room * 4, 330 + state.room * 10);
@@ -296,10 +295,12 @@
         const key = Math.round(x / 50) + ":" + Math.round(y / 44);
         if (used.has(key)) continue;
         used.add(key);
+
         let type = "brick";
         if (state.room >= 3 && Math.random() < 0.24) type = "stone";
         if (state.room >= 4 && Math.random() < 0.16) type = "spike";
         if (state.room >= 6 && Math.random() < 0.12) type = "portal";
+
         const hp = type === "stone" ? 3 : type === "portal" ? 2 : 1;
         state.blocks.push({ x, y, w: 44, h: 26, type, hp, maxHp: hp, pulse: rand(0, Math.PI * 2) });
       }
@@ -310,6 +311,7 @@
         const dir = Math.random() < 0.5 ? -1 : 1;
         const speed = (330 + state.room * 10) * state.mods.ballSpeed;
         const angle = rand(-0.5, 0.5);
+
         state.balls.push({
           x: W / 2 + rand(-18, 18),
           y: H / 2 + rand(-70, 70),
@@ -327,10 +329,12 @@
     function createDraft() {
       const pool = relics.filter(r => !state.relics.includes(r.id) || ["heart", "shield", "luck", "meteor", "comet"].includes(r.id));
       const draft = [];
+
       while (draft.length < 3 && pool.length) {
         const relic = pick(pool);
         if (!draft.includes(relic)) draft.push(relic);
       }
+
       state.draft = draft;
       state.mode = "upgrade";
       state.message = "Choose a relic";
@@ -340,16 +344,19 @@
 
     function chooseRelic(index) {
       if (state.mode !== "upgrade" || !state.draft[index]) return;
+
       const relic = state.draft[index];
       relic.apply();
       state.relics.push(relic.id);
       state.room += 1;
+
       if (state.room > 12) {
         state.mode = "victory";
         saveBest();
         syncActionButton();
         return;
       }
+
       buildRoom();
       state.balls = [];
       state.message = "Room " + state.room;
@@ -368,6 +375,7 @@
       state.messageTimer = Math.max(0, state.messageTimer - dt);
       state.comboTimer = Math.max(0, state.comboTimer - dt);
       if (state.comboTimer === 0) state.combo = 0;
+
       state.shake = Math.max(0, state.shake - dt * 20);
       state.flash = Math.max(0, state.flash - dt * 1.7);
       state.player.invuln = Math.max(0, state.player.invuln - dt);
@@ -385,8 +393,13 @@
       const p = state.player;
       p.h = p.baseH * state.mods.paddleScale;
       p.oldY = p.y;
-      const keyMove = (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0) - (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0);
+
+      const keyMove =
+        (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0) -
+        (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0);
+
       if (pointer.active) p.y += (pointer.y - p.y) * clamp(dt * 14, 0, 1);
+
       p.y += keyMove * p.speed * state.mods.paddleSpeed * dt;
       p.y = clamp(p.y, 22 + p.h / 2, H - 22 - p.h / 2);
       p.vy = (p.y - p.oldY) / Math.max(dt, 0.001);
@@ -395,12 +408,15 @@
     function updateEnemy(dt) {
       const e = state.enemy;
       e.oldY = e.y;
+
       if (e.stun > 0) {
         e.vy = 0;
         return;
       }
+
       const incoming = state.balls.filter(b => b.vx > 0).sort((a, b) => b.x - a.x)[0] || state.balls[0];
       const targetY = incoming ? incoming.y + Math.sin(performance.now() / 430 + state.room) * 24 : H / 2;
+
       e.y += clamp(targetY - e.y, -1, 1) * e.speed * state.mods.enemySlow * dt;
       e.y = clamp(e.y, 22 + e.h / 2, H - 22 - e.h / 2);
       e.vy = (e.y - e.oldY) / Math.max(dt, 0.001);
@@ -409,18 +425,21 @@
     function updateBalls(dt) {
       for (let i = state.balls.length - 1; i >= 0; i--) {
         const b = state.balls[i];
+
         b.trail.push({ x: b.x, y: b.y, life: 0.22 });
         if (b.trail.length > 18) b.trail.shift();
+
         for (const t of b.trail) t.life -= dt;
         b.trail = b.trail.filter(t => t.life > 0);
 
         if (Math.abs(b.spin) > 0.01) {
-          b.vy += b.spin * Math.sign(b.vx || 1) * 430 * dt;
-          b.spin *= Math.pow(0.80, dt);
+          b.vy += b.spin * Math.sign(b.vx || 1) * 820 * dt;
+          b.spin *= Math.pow(0.93, dt);
         }
 
         const speed = hypot(b.vx, b.vy);
         const maxSpeed = 720 + state.room * 14;
+
         if (speed > maxSpeed) {
           b.vx = b.vx / speed * maxSpeed;
           b.vy = b.vy / speed * maxSpeed;
@@ -432,13 +451,14 @@
         if (b.y < 22 + b.r) {
           b.y = 22 + b.r;
           b.vy = Math.abs(b.vy);
-          b.spin *= -0.65;
+          b.spin *= -0.90;
           burst(b.x, b.y, C.cyan, 8);
         }
+
         if (b.y > H - 22 - b.r) {
           b.y = H - 22 - b.r;
           b.vy = -Math.abs(b.vy);
-          b.spin *= -0.65;
+          b.spin *= -0.90;
           burst(b.x, b.y, C.cyan, 8);
         }
 
@@ -451,11 +471,14 @@
           hurtPlayer(1);
         } else if (b.x > W + 36) {
           state.balls.splice(i, 1);
+
           let damage = b.damage;
+
           if (state.mods.spinDamage && Math.abs(b.spin) > 0.75) {
             damage += 1;
             floatText(W - 80, b.y, "SPIN +1", C.cyan);
           }
+
           hitEnemy(damage, W - 70, b.y);
         }
       }
@@ -489,7 +512,15 @@
       b.x = isPlayer ? r.x + r.w + b.r + 0.2 : r.x - b.r - 0.2;
 
       burst(b.x, b.y, isPlayer ? C.cyan : p.color, Math.abs(b.spin) > 0.65 ? 22 : 12);
-      if (Math.abs(b.spin) > 0.65) floatText(b.x, b.y - 18, b.spin > 0 ? "TOPSPIN" : "BACKSPIN", b.spin > 0 ? C.gold : C.purple);
+
+      if (Math.abs(b.spin) > 0.65) {
+        floatText(
+          b.x,
+          b.y - 18,
+          b.spin > 0 ? "TOPSPIN" : "BACKSPIN",
+          b.spin > 0 ? C.gold : C.purple
+        );
+      }
     }
 
     function collideBlocks(b) {
@@ -501,8 +532,10 @@
         const cy = block.y + block.h / 2;
         const dx = (b.x - cx) / (block.w / 2);
         const dy = (b.y - cy) / (block.h / 2);
+
         if (Math.abs(dx) > Math.abs(dy)) b.vx *= -1;
         else b.vy *= -1;
+
         b.spin *= 0.92;
 
         block.hp -= 1;
@@ -515,30 +548,35 @@
           b.vy += rand(-90, 90);
           burst(b.x, b.y, C.purple, 20);
         }
+
         if (block.type === "spike" && b.lastHit !== "player") hurtPlayer(1);
 
         if (block.hp <= 0) {
           state.blocks.splice(i, 1);
           addScore(block.type === "spike" ? 80 : block.type === "portal" ? 95 : 50, cx, cy, "BROKE");
         }
+
         return;
       }
     }
 
     function hurtPlayer(amount) {
       if (state.player.invuln > 0) return;
+
       if (state.mods.shield > 0) {
         state.mods.shield -= 1;
         floatText(90, state.player.y, "SHIELD", C.cyan);
         burst(state.player.x + 14, state.player.y, C.cyan, 28);
         return;
       }
+
       state.player.hp -= amount;
       state.player.invuln = 1;
       state.combo = 0;
       state.flash = 0.2;
       state.shake = 10;
       burst(state.player.x, state.player.y, C.pink, 34);
+
       if (state.player.hp <= 0) {
         state.mode = "gameover";
         saveBest();
@@ -551,15 +589,18 @@
         amount *= 2;
         floatText(x, y - 20, "CRIT", C.gold);
       }
+
       state.enemy.hp -= amount;
       state.enemy.stun = Math.max(state.enemy.stun, 0.12);
       state.shake = Math.max(state.shake, 4 + amount * 2);
       addScore(70 * amount, x, y, "-" + amount + " HP");
       burst(x, y, state.enemy.color, 20 + amount * 5);
+
       if (state.enemy.hp <= 0 && state.mode === "playing") {
         state.balls = [];
         addScore(250 + state.room * 50, W / 2, H / 2, "ROOM CLEAR");
         state.mode = "cleared";
+
         setTimeout(() => {
           if (state.mode === "cleared") createDraft();
         }, 350);
@@ -582,7 +623,15 @@
       for (let i = 0; i < count; i++) {
         const a = rand(0, Math.PI * 2);
         const s = rand(35, 240);
-        state.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: rand(1.2, 3.4), color, life: rand(0.25, 0.85) });
+        state.particles.push({
+          x,
+          y,
+          vx: Math.cos(a) * s,
+          vy: Math.sin(a) * s,
+          r: rand(1.2, 3.4),
+          color,
+          life: rand(0.25, 0.85)
+        });
       }
     }
 
@@ -594,12 +643,14 @@
         p.vy *= Math.pow(0.06, dt);
         p.life -= dt;
       }
+
       state.particles = state.particles.filter(p => p.life > 0);
 
       for (const f of state.floats) {
         f.y += f.vy * dt;
         f.life -= dt;
       }
+
       state.floats = state.floats.filter(f => f.life > 0);
     }
 
@@ -613,15 +664,20 @@
     function draw() {
       const sx = state.shake ? rand(-state.shake, state.shake) : 0;
       const sy = state.shake ? rand(-state.shake, state.shake) : 0;
+
       ctx.save();
       ctx.translate(sx, sy);
+
       drawBackground();
       drawArena();
       drawBlocks();
+
       if (state.player && state.enemy) drawPaddles();
+
       drawBalls();
       drawEffects();
       drawHud();
+
       ctx.restore();
 
       if (state.flash > 0) {
@@ -641,18 +697,21 @@
       g.addColorStop(0, "#101735");
       g.addColorStop(0.55, "#070914");
       g.addColorStop(1, "#16091c");
+
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, W, H);
 
       ctx.save();
       ctx.globalAlpha = 0.16;
       ctx.strokeStyle = C.cyan;
+
       for (let x = -80; x < W + 120; x += 48) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
         ctx.lineTo(x - 115, H);
         ctx.stroke();
       }
+
       ctx.restore();
     }
 
@@ -660,38 +719,48 @@
       ctx.save();
       ctx.strokeStyle = "rgba(255,255,255,0.16)";
       ctx.lineWidth = 2;
+
       rounded(16, 16, W - 32, H - 32, 22);
       ctx.stroke();
+
       ctx.setLineDash([8, 14]);
       ctx.beginPath();
       ctx.moveTo(W / 2, 30);
       ctx.lineTo(W / 2, H - 30);
       ctx.stroke();
+
       ctx.restore();
     }
 
     function drawBlocks() {
       for (const b of state.blocks) {
         ctx.save();
+
         const color = blockColor(b);
         ctx.shadowColor = color;
         ctx.shadowBlur = b.type === "portal" ? 18 : 8;
         ctx.fillStyle = color;
         ctx.globalAlpha = b.type === "stone" ? 0.75 : 0.9;
+
         rounded(b.x, b.y, b.w, b.h, 7);
         ctx.fill();
+
         ctx.globalAlpha = 1;
         ctx.shadowBlur = 0;
         ctx.strokeStyle = "rgba(255,255,255,0.24)";
         ctx.stroke();
+
         if (b.maxHp > 1) {
           ctx.fillStyle = "rgba(0,0,0,0.36)";
           ctx.fillRect(b.x + 6, b.y + b.h - 7, b.w - 12, 3);
+
           ctx.fillStyle = C.text;
           ctx.fillRect(b.x + 6, b.y + b.h - 7, (b.w - 12) * b.hp / b.maxHp, 3);
         }
+
         if (b.type === "spike") {
           ctx.fillStyle = "rgba(0,0,0,0.38)";
+
           for (let i = 0; i < 3; i++) {
             ctx.beginPath();
             ctx.moveTo(b.x + 9 + i * 12, b.y + b.h - 5);
@@ -700,12 +769,14 @@
             ctx.fill();
           }
         }
+
         if (b.type === "portal") {
           ctx.strokeStyle = "rgba(255,255,255,0.76)";
           ctx.beginPath();
           ctx.ellipse(b.x + b.w / 2, b.y + b.h / 2, 13, 7, performance.now() / 350, 0, Math.PI * 2);
           ctx.stroke();
         }
+
         ctx.restore();
       }
     }
@@ -724,16 +795,20 @@
 
     function drawPaddle(p, alpha) {
       const r = paddleRect(p);
+
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.shadowColor = p.color;
       ctx.shadowBlur = 18;
+
       const g = ctx.createLinearGradient(r.x, r.y, r.x + r.w, r.y + r.h);
       g.addColorStop(0, p.color);
       g.addColorStop(1, "#ffffff");
+
       ctx.fillStyle = g;
       rounded(r.x, r.y, r.w, r.h, 8);
       ctx.fill();
+
       ctx.restore();
     }
 
@@ -741,6 +816,7 @@
       for (const b of state.balls) {
         for (let i = 0; i < b.trail.length; i++) {
           const t = b.trail[i];
+
           ctx.save();
           ctx.globalAlpha = (i / b.trail.length) * 0.23;
           ctx.fillStyle = Math.abs(b.spin) > 0.7 ? C.gold : C.cyan;
@@ -751,12 +827,15 @@
         }
 
         ctx.save();
+
         ctx.shadowColor = Math.abs(b.spin) > 0.7 ? C.gold : C.cyan;
         ctx.shadowBlur = 22;
+
         const g = ctx.createRadialGradient(b.x - 3, b.y - 3, 1, b.x, b.y, b.r + 5);
         g.addColorStop(0, "#ffffff");
         g.addColorStop(0.5, C.cyan);
         g.addColorStop(1, "rgba(255,255,255,0.16)");
+
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
@@ -765,6 +844,7 @@
         if (Math.abs(b.spin) > 0.06) {
           const dir = b.spin > 0 ? 1 : -1;
           const a = performance.now() / 120 * dir;
+
           ctx.globalAlpha = clamp(Math.abs(b.spin) / 2.5, 0.24, 0.95);
           ctx.shadowBlur = 0;
           ctx.strokeStyle = b.spin > 0 ? C.gold : C.purple;
@@ -773,6 +853,7 @@
           ctx.arc(b.x, b.y, b.r + 5, a, a + Math.PI * 1.25);
           ctx.stroke();
         }
+
         ctx.restore();
       }
     }
@@ -787,6 +868,7 @@
         ctx.fill();
         ctx.restore();
       }
+
       for (const f of state.floats) {
         ctx.save();
         ctx.globalAlpha = clamp(f.life * 1.25, 0, 1);
@@ -800,10 +882,13 @@
 
     function drawHud() {
       if (!state.player || !state.enemy) return;
+
       ctx.save();
+
       ctx.fillStyle = "rgba(0,0,0,0.28)";
       rounded(24, 22, W - 48, 58, 16);
       ctx.fill();
+
       ctx.strokeStyle = "rgba(255,255,255,0.14)";
       ctx.stroke();
 
@@ -811,15 +896,22 @@
       ctx.font = "900 18px ui-sans-serif, system-ui";
       ctx.textAlign = "left";
       ctx.fillText("Room " + state.room + "/12", 42, 56);
+
       drawHearts(158, 52);
 
-      const ex = 340, ey = 43, ew = 280, eh = 10;
+      const ex = 340;
+      const ey = 43;
+      const ew = 280;
+      const eh = 10;
+
       ctx.fillStyle = "rgba(255,255,255,0.12)";
       rounded(ex, ey, ew, eh, 7);
       ctx.fill();
+
       ctx.fillStyle = state.enemy.color;
       rounded(ex, ey, ew * clamp(state.enemy.hp / state.enemy.maxHp, 0, 1), eh, 7);
       ctx.fill();
+
       ctx.fillStyle = C.muted;
       ctx.font = "700 12px ui-sans-serif, system-ui";
       ctx.textAlign = "center";
@@ -829,19 +921,23 @@
       ctx.fillStyle = C.gold;
       ctx.font = "900 18px ui-sans-serif, system-ui";
       ctx.fillText(String(state.score).padStart(6, "0"), W - 42, 48);
+
       ctx.fillStyle = C.muted;
       ctx.font = "700 12px ui-sans-serif, system-ui";
       ctx.fillText("BEST " + state.best, W - 42, 66);
 
       const spin = state.balls.reduce((m, b) => Math.abs(b.spin) > Math.abs(m) ? b.spin : m, 0);
+
       if (Math.abs(spin) > 0.08) {
         ctx.textAlign = "left";
         ctx.fillStyle = spin > 0 ? C.gold : C.purple;
         ctx.font = "900 13px ui-sans-serif, system-ui";
         ctx.fillText("SPIN " + (spin > 0 ? "↻" : "↺"), 42, 100);
+
         ctx.fillStyle = "rgba(255,255,255,0.14)";
         rounded(104, 90, 86, 8, 5);
         ctx.fill();
+
         ctx.fillStyle = spin > 0 ? C.gold : C.purple;
         rounded(104, 90, 86 * clamp(Math.abs(spin) / 2.7, 0, 1), 8, 5);
         ctx.fill();
@@ -860,6 +956,7 @@
         ctx.font = "900 42px ui-sans-serif, system-ui";
         ctx.fillText(state.message, W / 2, H / 2 - 116);
       }
+
       ctx.restore();
     }
 
@@ -873,95 +970,135 @@
 
     function drawTitle() {
       overlay(0.74);
+
       ctx.save();
       ctx.textAlign = "center";
+
       ctx.fillStyle = C.text;
       ctx.font = "900 62px ui-sans-serif, system-ui";
       ctx.fillText("Rogue Pong", W / 2, 176);
+
       ctx.fillStyle = C.cyan;
       ctx.font = "900 23px ui-sans-serif, system-ui";
       ctx.fillText("Spin Dungeon", W / 2, 214);
+
       ctx.fillStyle = C.muted;
       ctx.font = "600 18px ui-sans-serif, system-ui";
-      wrapText("Click Start, press Space, or tap the arena. Move your paddle while hitting the ball to add topspin or backspin. Clear rooms and draft relics.", W / 2, 272, 660, 28);
+      wrapText(
+        "Click Start, press Space, or tap the arena. Move your paddle while hitting the ball to add topspin or backspin. Clear rooms and draft relics.",
+        W / 2,
+        272,
+        660,
+        28
+      );
+
       drawButton(W / 2 - 132, 356, 264, 58, "Start game", C.cyan);
+
       ctx.fillStyle = C.muted;
       ctx.font = "700 14px ui-sans-serif, system-ui";
       ctx.fillText("Keyboard, mouse, and touch are all active on this screen.", W / 2, 456);
+
       ctx.restore();
     }
 
     function drawUpgrade() {
       overlay(0.76);
+
       ctx.save();
       ctx.textAlign = "center";
+
       ctx.fillStyle = C.text;
       ctx.font = "900 44px ui-sans-serif, system-ui";
       ctx.fillText("Choose a Relic", W / 2, 126);
+
       ctx.fillStyle = C.muted;
       ctx.font = "700 16px ui-sans-serif, system-ui";
       ctx.fillText("Click a card or press 1, 2, or 3.", W / 2, 156);
-      const cardW = 250, gap = 22, y = 210;
+
+      const cardW = 250;
+      const gap = 22;
+      const y = 210;
       const startX = W / 2 - (cardW * 3 + gap * 2) / 2;
+
       state.draft.forEach((r, i) => {
         const x = startX + i * (cardW + gap);
+
         ctx.save();
+
         ctx.fillStyle = "rgba(14,18,37,0.94)";
         ctx.strokeStyle = "rgba(255,255,255,0.18)";
         ctx.lineWidth = 2;
+
         rounded(x, y, cardW, 236, 18);
         ctx.fill();
         ctx.stroke();
+
         ctx.fillStyle = C.gold;
         ctx.font = "900 48px ui-sans-serif, system-ui";
         ctx.fillText(r.icon, x + cardW / 2, y + 70);
+
         ctx.fillStyle = C.text;
         ctx.font = "900 23px ui-sans-serif, system-ui";
         ctx.fillText((i + 1) + ". " + r.name, x + cardW / 2, y + 114);
+
         ctx.fillStyle = C.muted;
         ctx.font = "700 15px ui-sans-serif, system-ui";
         wrapText(r.desc, x + cardW / 2, y + 154, cardW - 46, 22);
+
         ctx.fillStyle = "rgba(128,247,255,0.14)";
         rounded(x + 54, y + 188, cardW - 108, 34, 10);
         ctx.fill();
+
         ctx.fillStyle = C.cyan;
         ctx.font = "900 13px ui-sans-serif, system-ui";
         ctx.fillText("PRESS " + (i + 1), x + cardW / 2, y + 210);
+
         ctx.restore();
       });
+
       ctx.restore();
     }
 
     function drawEnd(victory) {
       overlay(0.75);
+
       ctx.save();
       ctx.textAlign = "center";
+
       ctx.fillStyle = victory ? C.gold : C.pink;
       ctx.font = "900 58px ui-sans-serif, system-ui";
       ctx.fillText(victory ? "Dungeon Cleared" : "Run Ended", W / 2, 190);
+
       ctx.fillStyle = C.text;
       ctx.font = "900 26px ui-sans-serif, system-ui";
       ctx.fillText("Score " + state.score + " · Best " + state.best, W / 2, 238);
+
       ctx.fillStyle = C.muted;
       ctx.font = "700 17px ui-sans-serif, system-ui";
       ctx.fillText("Rooms reached: " + state.room + " · Relics: " + state.relics.length, W / 2, 274);
+
       drawButton(W / 2 - 120, 345, 240, 54, "Restart", victory ? C.gold : C.pink);
+
       ctx.fillStyle = C.muted;
       ctx.font = "700 14px ui-sans-serif, system-ui";
       ctx.fillText("Press R, Space, or click Restart", W / 2, 430);
+
       ctx.restore();
     }
 
     function drawPause() {
       overlay(0.58);
+
       ctx.save();
       ctx.textAlign = "center";
       ctx.fillStyle = C.text;
       ctx.font = "900 54px ui-sans-serif, system-ui";
       ctx.fillText("Paused", W / 2, H / 2 - 8);
+
       ctx.fillStyle = C.muted;
       ctx.font = "700 18px ui-sans-serif, system-ui";
       ctx.fillText("Press P to resume", W / 2, H / 2 + 36);
+
       ctx.restore();
     }
 
@@ -972,24 +1109,30 @@
 
     function drawButton(x, y, w, h, text, color) {
       ctx.save();
+
       ctx.shadowColor = color;
       ctx.shadowBlur = 18;
       ctx.fillStyle = color;
+
       rounded(x, y, w, h, 16);
       ctx.fill();
+
       ctx.shadowBlur = 0;
       ctx.fillStyle = "rgba(0,0,0,0.72)";
       ctx.font = "900 18px ui-sans-serif, system-ui";
       ctx.textAlign = "center";
       ctx.fillText(text, x + w / 2, y + h / 2 + 6);
+
       ctx.restore();
     }
 
     function wrapText(text, x, y, maxWidth, lineHeight) {
       const words = text.split(" ");
       let line = "";
+
       for (const word of words) {
         const test = line + word + " ";
+
         if (ctx.measureText(test).width > maxWidth && line) {
           ctx.fillText(line.trim(), x, y);
           line = word + " ";
@@ -998,11 +1141,13 @@
           line = test;
         }
       }
+
       ctx.fillText(line.trim(), x, y);
     }
 
     function rounded(x, y, w, h, r) {
       r = Math.min(r, w / 2, h / 2);
+
       ctx.beginPath();
       ctx.moveTo(x + r, y);
       ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -1022,6 +1167,7 @@
 
     function canvasPoint(event) {
       const rect = canvas.getBoundingClientRect();
+
       return {
         x: (event.clientX - rect.left) * W / rect.width,
         y: (event.clientY - rect.top) * H / rect.height
@@ -1033,12 +1179,19 @@
         newRun();
         return;
       }
+
       if (state.mode === "upgrade") {
-        const cardW = 250, gap = 22, cardY = 210;
+        const cardW = 250;
+        const gap = 22;
+        const cardY = 210;
         const startX = W / 2 - (cardW * 3 + gap * 2) / 2;
+
         for (let i = 0; i < 3; i++) {
           const cardX = startX + i * (cardW + gap);
-          if (x >= cardX && x <= cardX + cardW && y >= cardY && y <= cardY + 236) chooseRelic(i);
+
+          if (x >= cardX && x <= cardX + cardW && y >= cardY && y <= cardY + 236) {
+            chooseRelic(i);
+          }
         }
       }
     }
@@ -1059,17 +1212,22 @@
 
     canvas.addEventListener("pointerdown", event => {
       const p = canvasPoint(event);
+
       pointer.active = true;
       pointer.y = p.y;
+
       clickAt(p.x, p.y);
       canvas.focus();
+
       event.preventDefault();
     });
 
     canvas.addEventListener("pointermove", event => {
       const p = canvasPoint(event);
+
       pointer.active = true;
       pointer.y = p.y;
+
       event.preventDefault();
     });
 
@@ -1081,15 +1239,29 @@
 
     window.addEventListener("keydown", event => {
       keys.add(event.code);
-      if (["Space", "ArrowUp", "ArrowDown"].includes(event.code)) event.preventDefault();
+
+      if (["Space", "ArrowUp", "ArrowDown"].includes(event.code)) {
+        event.preventDefault();
+      }
 
       if (event.code === "Space") {
-        if (state.mode === "title" || state.mode === "gameover" || state.mode === "victory") newRun();
-        else if (state.mode === "playing" && state.balls.length === 0) serve(1);
+        if (state.mode === "title" || state.mode === "gameover" || state.mode === "victory") {
+          newRun();
+        } else if (state.mode === "playing" && state.balls.length === 0) {
+          serve(1);
+        }
       }
+
       if (event.code === "KeyR") newRun();
-      if (event.code === "KeyP" && state.mode === "playing") state.paused = !state.paused;
-      if (state.mode === "upgrade" && ["Digit1", "Digit2", "Digit3", "Numpad1", "Numpad2", "Numpad3"].includes(event.code)) {
+
+      if (event.code === "KeyP" && state.mode === "playing") {
+        state.paused = !state.paused;
+      }
+
+      if (
+        state.mode === "upgrade" &&
+        ["Digit1", "Digit2", "Digit3", "Numpad1", "Numpad2", "Numpad3"].includes(event.code)
+      ) {
         chooseRelic(Number(event.code.replace("Digit", "").replace("Numpad", "")) - 1);
       }
     });
@@ -1104,8 +1276,10 @@
     function loop(t) {
       const dt = Math.min(0.033, (t - state.last) / 1000 || 0);
       state.last = t;
+
       update(dt);
       draw();
+
       requestAnimationFrame(loop);
     }
 
