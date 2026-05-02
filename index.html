@@ -1,156 +1,70 @@
+Replace your entire `index.html` with this:
+
 ```html
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Rogue Pong: Spin Dungeon</title>
   <style>
     :root {
-      --bg: #070914;
-      --panel: rgba(14, 18, 37, 0.82);
-      --line: rgba(255, 255, 255, 0.16);
       --text: #f5f7ff;
       --muted: #a6afcf;
       --cyan: #80f7ff;
       --pink: #ff5f7e;
       --gold: #ffd166;
       --purple: #a98cff;
-      --green: #80ff9a;
     }
 
     * { box-sizing: border-box; }
 
-    html, body {
-      margin: 0;
-      min-height: 100%;
-      background:
-        radial-gradient(circle at 20% 10%, rgba(128, 247, 255, 0.16), transparent 28%),
-        radial-gradient(circle at 80% 20%, rgba(169, 140, 255, 0.16), transparent 28%),
-        radial-gradient(circle at 50% 115%, rgba(255, 95, 126, 0.18), transparent 35%),
-        linear-gradient(180deg, #11162b, var(--bg));
-      color: var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      overflow: hidden;
-    }
-
+    html,
     body {
-      display: grid;
-      place-items: center;
-      padding: 14px;
-    }
-
-    .shell {
-      width: min(1100px, 100%);
-      display: grid;
-      gap: 12px;
-    }
-
-    .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 14px;
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      background: var(--panel);
-      backdrop-filter: blur(12px);
-    }
-
-    h1 {
+      width: 100%;
+      height: 100%;
       margin: 0;
-      font-size: clamp(1.05rem, 2.8vw, 1.55rem);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-
-    .help {
-      color: var(--muted);
-      font-size: 0.88rem;
-      text-align: right;
-    }
-
-    kbd {
-      display: inline-block;
-      min-width: 1.6em;
-      padding: 1px 6px;
-      border: 1px solid var(--line);
-      border-bottom-color: rgba(255, 255, 255, 0.35);
-      border-radius: 7px;
-      color: var(--text);
-      background: rgba(255, 255, 255, 0.08);
-      text-align: center;
-      font: inherit;
-    }
-
-    .stage {
-      position: relative;
-      border: 1px solid var(--line);
-      border-radius: 24px;
       overflow: hidden;
       background: #050714;
-      box-shadow: 0 28px 90px rgba(0, 0, 0, 0.48);
-      touch-action: none;
-      user-select: none;
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overscroll-behavior: none;
     }
 
-    canvas {
+    #game {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100dvh;
       display: block;
-      width: 100%;
-      height: auto;
-      outline: none;
       cursor: crosshair;
+      touch-action: none;
+      user-select: none;
+      outline: none;
     }
 
     #actionButton {
-      position: absolute;
+      position: fixed;
       left: 50%;
-      bottom: 22px;
+      bottom: max(22px, env(safe-area-inset-bottom));
       transform: translateX(-50%);
-      z-index: 2;
+      z-index: 3;
       border: 0;
       border-radius: 999px;
-      padding: 13px 22px;
+      padding: 13px 24px;
       color: #071018;
       background: var(--cyan);
       font-weight: 900;
       letter-spacing: 0.02em;
-      box-shadow: 0 0 24px rgba(128, 247, 255, 0.32);
+      box-shadow: 0 0 24px rgba(128, 247, 255, 0.34);
     }
 
     #actionButton[hidden] { display: none; }
-
-    .footer {
-      text-align: center;
-      color: var(--muted);
-      font-size: 0.84rem;
-    }
-
-    @media (max-width: 760px) {
-      body { padding: 8px; }
-      .topbar { align-items: flex-start; flex-direction: column; }
-      .help { text-align: left; font-size: 0.78rem; }
-      .footer { display: none; }
-    }
   </style>
 </head>
 <body>
-  <main class="shell">
-    <section class="topbar">
-      <h1>Rogue Pong: Spin Dungeon</h1>
-      <div class="help">
-        <kbd>W</kbd>/<kbd>S</kbd> or <kbd>↑</kbd>/<kbd>↓</kbd> · mouse/touch moves paddle · move while hitting for spin · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> choose relic · <kbd>P</kbd> pause · <kbd>R</kbd> restart
-      </div>
-    </section>
-
-    <section class="stage" id="stage">
-      <canvas id="game" width="960" height="600" tabindex="0" aria-label="Rogue Pong game canvas"></canvas>
-      <button id="actionButton" type="button">Start game</button>
-    </section>
-
-    <div class="footer">No build step. Save this file as <strong>index.html</strong> in the root of a GitHub Pages repo.</div>
-  </main>
+  <canvas id="game" tabindex="0" aria-label="Rogue Pong game canvas"></canvas>
+  <button id="actionButton" type="button">Start game</button>
 
   <script>
   (() => {
@@ -159,8 +73,10 @@
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
     const actionButton = document.getElementById("actionButton");
-    const W = canvas.width;
-    const H = canvas.height;
+
+    let W = 960;
+    let H = 600;
+    let DPR = 1;
 
     const C = {
       text: "#f5f7ff",
@@ -170,7 +86,36 @@
       gold: "#ffd166",
       purple: "#a98cff",
       green: "#80ff9a",
-      blue: "#55a7ff"
+      blue: "#55a7ff",
+      stone: "#858da9"
+    };
+
+    const CFG = {
+      arena: { pad: 18 },
+      paddle: { playerX: 34, enemyGap: 48, w: 14, playerH: 76, enemyH: 84, speed: 540 },
+      ball: {
+        radius: 8,
+        speed: 350,
+        spinCurve: 820,
+        spinDecay: 0.93,
+        wallSpinKeep: -0.86,
+        minSpeed: 400,
+        maxSpeedBase: 740,
+        minHorizontalRatio: 0.52,
+        maxVerticalRatio: 1.10
+      },
+      blocks: {
+        w: 44,
+        h: 26,
+        baseCount: 7,
+        maxCount: 32,
+        respawnBase: 3.8,
+        respawnStep: 0.23,
+        respawnMin: 0.75,
+        marginX: 150,
+        marginY: 92
+      },
+      room: { max: 12 }
     };
 
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -179,7 +124,7 @@
     const hypot = Math.hypot;
 
     const keys = new Set();
-    const pointer = { active: false, y: H / 2 };
+    const pointer = { mode: "mouse", active: false, y: H / 2, lastX: null, lastY: null };
 
     const storage = {
       get(key, fallback) {
@@ -207,6 +152,7 @@
       messageTimer: 0,
       balls: [],
       blocks: [],
+      previews: [],
       particles: [],
       floats: [],
       draft: [],
@@ -222,7 +168,7 @@
         paddleSpeed: 1,
         ballSpeed: 1,
         damage: 1,
-        radius: 8,
+        radius: CFG.ball.radius,
         spinPower: 1,
         spinDamage: false,
         extraBalls: 0,
@@ -234,10 +180,10 @@
     }
 
     const relics = [
-      { id: "wide", name: "Giant Bat", icon: "▌", desc: "+25% paddle height.", apply: () => state.mods.paddleScale += 0.25 },
+      { id: "wide", name: "Giant Bat", icon: "▌", desc: "+22% paddle height.", apply: () => state.mods.paddleScale += 0.22 },
       { id: "boots", name: "Greased Boots", icon: "⇅", desc: "+18% paddle speed.", apply: () => state.mods.paddleSpeed *= 1.18 },
       { id: "heart", name: "Iron Heart", icon: "♥", desc: "+1 max HP and heal 1.", apply: () => { state.mods.maxHp += 1; state.player.hp = Math.min(state.mods.maxHp, state.player.hp + 1); } },
-      { id: "meteor", name: "Meteor Ball", icon: "✦", desc: "+1 ball damage, slightly larger ball.", apply: () => { state.mods.damage += 1; state.mods.radius += 1; } },
+      { id: "meteor", name: "Meteor Ball", icon: "✦", desc: "+1 ball damage.", apply: () => state.mods.damage += 1 },
       { id: "comet", name: "Comet Core", icon: "●", desc: "+12% ball speed.", apply: () => state.mods.ballSpeed *= 1.12 },
       { id: "echo", name: "Echo Orb", icon: "◎", desc: "+1 extra ball each room.", apply: () => state.mods.extraBalls += 1 },
       { id: "gyro", name: "Gyro Grip", icon: "◌", desc: "+40% paddle spin power.", apply: () => state.mods.spinPower *= 1.4 },
@@ -246,6 +192,125 @@
       { id: "shield", name: "Glass Aegis", icon: "◇", desc: "+1 shield against a missed ball.", apply: () => state.mods.shield += 1 },
       { id: "luck", name: "Lucky Edge", icon: "⚅", desc: "+12% chance to double damage.", apply: () => state.mods.crit += 0.12 }
     ];
+
+    function resize() {
+      DPR = Math.min(window.devicePixelRatio || 1, 2);
+      W = Math.max(360, window.innerWidth || document.documentElement.clientWidth || 960);
+      H = Math.max(420, window.innerHeight || document.documentElement.clientHeight || 600);
+      canvas.width = Math.floor(W * DPR);
+      canvas.height = Math.floor(H * DPR);
+      canvas.style.width = W + "px";
+      canvas.style.height = H + "px";
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      if (state.player) state.player.x = CFG.paddle.playerX;
+      if (state.enemy) state.enemy.x = W - CFG.paddle.enemyGap;
+      clampActors();
+    }
+
+    function clampActors() {
+      if (state.player) state.player.y = clamp(state.player.y, 24 + state.player.h / 2, H - 24 - state.player.h / 2);
+      if (state.enemy) state.enemy.y = clamp(state.enemy.y, 24 + state.enemy.h / 2, H - 24 - state.enemy.h / 2);
+      for (const b of state.balls) {
+        b.x = clamp(b.x, 30, W - 30);
+        b.y = clamp(b.y, 30, H - 30);
+      }
+    }
+
+    function makePaddle(x, y, color, hp, height, speed) {
+      return { x, y, oldY: y, vy: 0, w: CFG.paddle.w, h: height, baseH: height, speed, hp, maxHp: hp, color, invuln: 0, stun: 0 };
+    }
+
+    function makeEnemy() {
+      const hp = 4 + Math.floor(state.room * 1.35);
+      return makePaddle(W - CFG.paddle.enemyGap, H / 2, pick([C.purple, C.pink, C.green, C.gold, C.blue]), hp, CFG.paddle.enemyH + state.room * 3, 330 + state.room * 10);
+    }
+
+    function targetBlockCount() {
+      return clamp(CFG.blocks.baseCount + state.room * 2, CFG.blocks.baseCount, CFG.blocks.maxCount);
+    }
+
+    function blockRespawnDelay() {
+      return clamp(CFG.blocks.respawnBase - state.room * CFG.blocks.respawnStep, CFG.blocks.respawnMin, CFG.blocks.respawnBase);
+    }
+
+    function randomBlockType() {
+      let type = "brick";
+      if (state.room >= 3 && Math.random() < 0.24) type = "stone";
+      if (state.room >= 4 && Math.random() < 0.16) type = "spike";
+      if (state.room >= 6 && Math.random() < 0.12) type = "portal";
+      return type;
+    }
+
+    function blockHp(type) {
+      return type === "stone" ? 3 : type === "portal" ? 2 : 1;
+    }
+
+    function createBlock(x, y, type) {
+      const hp = blockHp(type);
+      return { x, y, w: CFG.blocks.w, h: CFG.blocks.h, type, hp, maxHp: hp, pulse: rand(0, Math.PI * 2) };
+    }
+
+    function blockColor(b) {
+      if (b.type === "stone") return C.stone;
+      if (b.type === "spike") return C.pink;
+      if (b.type === "portal") return C.purple;
+      return C.gold;
+    }
+
+    function overlaps(a, b, pad = 14) {
+      return a.x < b.x + b.w + pad && a.x + a.w + pad > b.x && a.y < b.y + b.h + pad && a.y + a.h + pad > b.y;
+    }
+
+    function findSpawnRect() {
+      const bw = CFG.blocks.w;
+      const bh = CFG.blocks.h;
+      const minX = Math.max(CFG.blocks.marginX, W * 0.25);
+      const maxX = Math.min(W - CFG.blocks.marginX - bw, W * 0.75);
+      const minY = CFG.blocks.marginY;
+      const maxY = H - CFG.blocks.marginY - bh;
+      const existing = state.blocks.concat(state.previews);
+
+      for (let tries = 0; tries < 120; tries++) {
+        const candidate = { x: rand(minX, Math.max(minX + 1, maxX)), y: rand(minY, Math.max(minY + 1, maxY)), w: bw, h: bh };
+        if (!existing.some(item => overlaps(candidate, item, 16))) return candidate;
+      }
+
+      return { x: rand(minX, Math.max(minX + 1, maxX)), y: rand(minY, Math.max(minY + 1, maxY)), w: bw, h: bh };
+    }
+
+    function scheduleBlockSpawn(delay = blockRespawnDelay()) {
+      const rect = findSpawnRect();
+      const type = randomBlockType();
+      state.previews.push({ ...rect, type, time: delay, total: delay, pulse: 0 });
+    }
+
+    function fillInitialBlocks() {
+      state.blocks = [];
+      state.previews = [];
+      const count = targetBlockCount();
+      for (let i = 0; i < count; i++) {
+        const rect = findSpawnRect();
+        state.blocks.push(createBlock(rect.x, rect.y, randomBlockType()));
+      }
+    }
+
+    function maintainBlockSpawns() {
+      while (state.blocks.length + state.previews.length < targetBlockCount()) scheduleBlockSpawn();
+    }
+
+    function updateBlockPreviews(dt) {
+      maintainBlockSpawns();
+      for (let i = state.previews.length - 1; i >= 0; i--) {
+        const p = state.previews[i];
+        p.time -= dt;
+        p.pulse += dt;
+        if (p.time <= 0) {
+          state.blocks.push(createBlock(p.x, p.y, p.type));
+          burst(p.x + p.w / 2, p.y + p.h / 2, blockColor(p), 14);
+          state.previews.splice(i, 1);
+        }
+      }
+    }
 
     function newRun() {
       state.mode = "playing";
@@ -260,85 +325,29 @@
       state.messageTimer = 1.25;
       state.balls = [];
       state.blocks = [];
+      state.previews = [];
       state.particles = [];
       state.floats = [];
       state.draft = [];
       state.relics = [];
       state.mods = baseMods();
-      state.player = makePaddle(34, H / 2, C.cyan, 5, 96, 520);
+      state.player = makePaddle(CFG.paddle.playerX, H / 2, C.cyan, 5, CFG.paddle.playerH, CFG.paddle.speed);
       buildRoom();
       serve(1 + state.mods.extraBalls);
       canvas.focus();
       syncActionButton();
     }
 
-    function makePaddle(x, y, color, hp, height, speed) {
-      return {
-        x,
-        y,
-        oldY: y,
-        vy: 0,
-        w: 14,
-        h: height,
-        baseH: height,
-        speed,
-        hp,
-        maxHp: hp,
-        color,
-        invuln: 0,
-        stun: 0
-      };
-    }
-
-    function makeEnemy() {
-      const colors = [C.purple, C.pink, C.green, C.gold, C.blue];
-      const hp = 4 + Math.floor(state.room * 1.35);
-      return makePaddle(W - 48, H / 2, pick(colors), hp, 92 + state.room * 4, 330 + state.room * 10);
-    }
-
     function buildRoom() {
       state.enemy = makeEnemy();
-      state.blocks = [];
-
-      const count = clamp(5 + state.room * 2, 7, 28);
-      const columns = [300, 360, 420, 480, 540, 600, 660];
-      const rows = [120, 170, 220, 270, 320, 370, 420, 470];
-      const used = new Set();
-
-      for (let i = 0; i < count; i++) {
-        const x = pick(columns) + rand(-8, 8);
-        const y = pick(rows) + rand(-8, 8);
-        const key = Math.round(x / 50) + ":" + Math.round(y / 44);
-
-        if (used.has(key)) continue;
-        used.add(key);
-
-        let type = "brick";
-        if (state.room >= 3 && Math.random() < 0.24) type = "stone";
-        if (state.room >= 4 && Math.random() < 0.16) type = "spike";
-        if (state.room >= 6 && Math.random() < 0.12) type = "portal";
-
-        const hp = type === "stone" ? 3 : type === "portal" ? 2 : 1;
-
-        state.blocks.push({
-          x,
-          y,
-          w: 44,
-          h: 26,
-          type,
-          hp,
-          maxHp: hp,
-          pulse: rand(0, Math.PI * 2)
-        });
-      }
+      fillInitialBlocks();
     }
 
     function serve(count = 1) {
       for (let i = 0; i < count; i++) {
         const dir = Math.random() < 0.5 ? -1 : 1;
-        const speed = (330 + state.room * 10) * state.mods.ballSpeed;
-        const angle = rand(-0.5, 0.5);
-
+        const speed = (CFG.ball.speed + state.room * 10) * state.mods.ballSpeed;
+        const angle = rand(-0.45, 0.45);
         state.balls.push({
           x: W / 2 + rand(-18, 18),
           y: H / 2 + rand(-70, 70),
@@ -356,14 +365,13 @@
     }
 
     function createDraft() {
-      const pool = relics.filter(r => !state.relics.includes(r.id) || ["heart", "shield", "luck", "meteor", "comet"].includes(r.id));
+      const repeatable = ["heart", "shield", "luck", "meteor", "comet"];
+      const pool = relics.filter(r => !state.relics.includes(r.id) || repeatable.includes(r.id));
       const draft = [];
-
       while (draft.length < 3 && pool.length) {
         const relic = pick(pool);
         if (!draft.includes(relic)) draft.push(relic);
       }
-
       state.draft = draft;
       state.mode = "upgrade";
       state.message = "Choose a relic";
@@ -373,24 +381,21 @@
 
     function chooseRelic(index) {
       if (state.mode !== "upgrade" || !state.draft[index]) return;
-
       const relic = state.draft[index];
       relic.apply();
       state.relics.push(relic.id);
       state.room += 1;
-
-      if (state.room > 12) {
+      if (state.room > CFG.room.max) {
         state.mode = "victory";
         saveBest();
         syncActionButton();
         return;
       }
-
-      buildRoom();
       state.balls = [];
       state.message = "Room " + state.room;
       state.messageTimer = 1.25;
       state.mode = "playing";
+      buildRoom();
       serve(1 + state.mods.extraBalls);
       syncActionButton();
     }
@@ -400,121 +405,156 @@
         updateEffects(dt);
         return;
       }
-
       state.messageTimer = Math.max(0, state.messageTimer - dt);
       state.comboTimer = Math.max(0, state.comboTimer - dt);
-
       if (state.comboTimer === 0) state.combo = 0;
-
       state.shake = Math.max(0, state.shake - dt * 20);
       state.flash = Math.max(0, state.flash - dt * 1.7);
       state.player.invuln = Math.max(0, state.player.invuln - dt);
       state.enemy.stun = Math.max(0, state.enemy.stun - dt);
-
+      updateBlockPreviews(dt);
       updatePlayer(dt);
       updateEnemy(dt);
       updateBalls(dt);
       updateEffects(dt);
-
       if (state.balls.length === 0 && state.mode === "playing") serve(1);
     }
 
     function updatePlayer(dt) {
       const p = state.player;
-
       p.h = p.baseH * state.mods.paddleScale;
       p.oldY = p.y;
-
-      const keyMove =
-        (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0) -
-        (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0);
-
-      if (pointer.active) {
-        p.y += (pointer.y - p.y) * clamp(dt * 14, 0, 1);
-      }
-
+      const keyMove = (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0) - (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0);
+      if (pointer.active && pointer.mode === "mouse") p.y += (pointer.y - p.y) * clamp(dt * 16, 0, 1);
       p.y += keyMove * p.speed * state.mods.paddleSpeed * dt;
-      p.y = clamp(p.y, 22 + p.h / 2, H - 22 - p.h / 2);
+      p.y = clamp(p.y, 24 + p.h / 2, H - 24 - p.h / 2);
       p.vy = (p.y - p.oldY) / Math.max(dt, 0.001);
     }
 
     function updateEnemy(dt) {
       const e = state.enemy;
-
       e.oldY = e.y;
-
       if (e.stun > 0) {
         e.vy = 0;
         return;
       }
-
       const incoming = state.balls.filter(b => b.vx > 0).sort((a, b) => b.x - a.x)[0] || state.balls[0];
       const targetY = incoming ? incoming.y + Math.sin(performance.now() / 430 + state.room) * 24 : H / 2;
-
       e.y += clamp(targetY - e.y, -1, 1) * e.speed * state.mods.enemySlow * dt;
-      e.y = clamp(e.y, 22 + e.h / 2, H - 22 - e.h / 2);
+      e.y = clamp(e.y, 24 + e.h / 2, H - 24 - e.h / 2);
       e.vy = (e.y - e.oldY) / Math.max(dt, 0.001);
     }
 
     function updateBalls(dt) {
       for (let i = state.balls.length - 1; i >= 0; i--) {
         const b = state.balls[i];
-
         b.trail.push({ x: b.x, y: b.y, life: 0.22 });
         if (b.trail.length > 18) b.trail.shift();
-
         for (const t of b.trail) t.life -= dt;
         b.trail = b.trail.filter(t => t.life > 0);
 
         if (Math.abs(b.spin) > 0.01) {
-          b.vy += b.spin * Math.sign(b.vx || 1) * 820 * dt;
-          b.spin *= Math.pow(0.93, dt);
+          b.vy += b.spin * Math.sign(b.vx || 1) * CFG.ball.spinCurve * dt;
+          b.spin *= Math.pow(CFG.ball.spinDecay, dt);
         }
 
         stabilizeBall(b);
-
         b.x += b.vx * dt;
         b.y += b.vy * dt;
 
-        if (b.y < 22 + b.r) {
-          handleWallBounce(b, true);
-        }
-
-        if (b.y > H - 22 - b.r) {
-          handleWallBounce(b, false);
-        }
+        if (b.y < CFG.arena.pad + b.r) handleWallBounce(b, true);
+        if (b.y > H - CFG.arena.pad - b.r) handleWallBounce(b, false);
 
         collidePaddle(b, state.player, true);
         collidePaddle(b, state.enemy, false);
         collideBlocks(b);
-
         stabilizeBall(b);
 
-        if (b.x < -36) {
+        if (b.x < -48) {
           state.balls.splice(i, 1);
           hurtPlayer(1);
-        } else if (b.x > W + 36) {
+        } else if (b.x > W + 48) {
           state.balls.splice(i, 1);
-
           let damage = b.damage;
-
           if (state.mods.spinDamage && Math.abs(b.spin) > 0.75) {
             damage += 1;
             floatText(W - 80, b.y, "SPIN +1", C.cyan);
           }
-
           hitEnemy(damage, W - 70, b.y);
         }
       }
     }
 
+    function stabilizeBall(b, forceEscape = false) {
+      const maxSpeed = CFG.ball.maxSpeedBase + state.room * 14;
+      if (!Number.isFinite(b.vx) || !Number.isFinite(b.vy)) {
+        const dir = Math.random() < 0.5 ? -1 : 1;
+        b.vx = dir * CFG.ball.minSpeed;
+        b.vy = rand(-130, 130);
+        b.spin = 0;
+        b.wallBounceStreak = 0;
+        return;
+      }
+
+      let speed = hypot(b.vx, b.vy);
+      if (speed < CFG.ball.minSpeed) {
+        const scale = CFG.ball.minSpeed / Math.max(speed, 1);
+        b.vx *= scale;
+        b.vy *= scale;
+        speed = CFG.ball.minSpeed;
+      }
+
+      if (forceEscape) {
+        const dir = b.lastHit === "player" ? 1 : b.lastHit === "enemy" ? -1 : (b.vx < 0 ? -1 : 1);
+        const ySign = Math.sign(b.vy || rand(-1, 1));
+        const target = clamp(speed, CFG.ball.minSpeed, maxSpeed);
+        const angle = rand(0.24, 0.52);
+        b.vx = dir * Math.cos(angle) * target;
+        b.vy = ySign * Math.sin(angle) * target;
+        b.spin *= 0.18;
+        b.wallBounceStreak = 0;
+        floatText(b.x, b.y, "ESCAPE", C.cyan);
+        return;
+      }
+
+      const dir = b.vx < 0 ? -1 : 1;
+      const minVx = speed * CFG.ball.minHorizontalRatio;
+      if (Math.abs(b.vx) < minVx) b.vx = dir * minVx;
+
+      const maxVy = Math.abs(b.vx) * CFG.ball.maxVerticalRatio;
+      if (Math.abs(b.vy) > maxVy) b.vy = Math.sign(b.vy || rand(-1, 1)) * maxVy;
+
+      speed = hypot(b.vx, b.vy);
+      if (speed > maxSpeed) {
+        const scale = maxSpeed / speed;
+        b.vx *= scale;
+        b.vy *= scale;
+      }
+    }
+
+    function handleWallBounce(b, topWall) {
+      const now = performance.now();
+      if (!b.lastWallBounceAt || now - b.lastWallBounceAt > 1200) b.wallBounceStreak = 0;
+      b.lastWallBounceAt = now;
+      b.wallBounceStreak = (b.wallBounceStreak || 0) + 1;
+
+      if (topWall) {
+        b.y = CFG.arena.pad + b.r;
+        b.vy = Math.abs(b.vy);
+      } else {
+        b.y = H - CFG.arena.pad - b.r;
+        b.vy = -Math.abs(b.vy);
+      }
+
+      b.spin *= CFG.ball.wallSpinKeep;
+      const tooVertical = Math.abs(b.vy) > Math.abs(b.vx) * 1.18;
+      const repeatedWallTrap = b.wallBounceStreak >= 2;
+      stabilizeBall(b, tooVertical || repeatedWallTrap);
+      burst(b.x, b.y, C.cyan, repeatedWallTrap ? 18 : 8);
+    }
+
     function paddleRect(p) {
-      return {
-        x: p.x,
-        y: p.y - p.h / 2,
-        w: p.w,
-        h: p.h
-      };
+      return { x: p.x, y: p.y - p.h / 2, w: p.w, h: p.h };
     }
 
     function rectCircle(rect, b) {
@@ -523,101 +563,15 @@
       return (b.x - cx) ** 2 + (b.y - cy) ** 2 <= b.r ** 2;
     }
 
-    function stabilizeBall(b, forceEscape = false) {
-      const minHorizontalRatio = 0.42;
-      const maxVerticalRatio = 1.55;
-      const minSpeed = 390;
-      const maxSpeed = 720 + state.room * 14;
-
-      if (!Number.isFinite(b.vx) || !Number.isFinite(b.vy)) {
-        const dir = Math.random() < 0.5 ? -1 : 1;
-        b.vx = dir * 420;
-        b.vy = rand(-130, 130);
-        b.spin = 0;
-        b.wallBounceStreak = 0;
-        return;
-      }
-
-      let speed = hypot(b.vx, b.vy);
-
-      if (speed < minSpeed) {
-        const scale = minSpeed / Math.max(speed, 1);
-        b.vx *= scale;
-        b.vy *= scale;
-        speed = minSpeed;
-      }
-
-      const oldDir = b.vx < 0 ? -1 : 1;
-      const minVx = speed * minHorizontalRatio;
-
-      if (Math.abs(b.vx) < minVx || forceEscape) {
-        const dir =
-          b.lastHit === "player" ? 1 :
-          b.lastHit === "enemy" ? -1 :
-          oldDir;
-
-        b.vx = dir * minVx;
-      }
-
-      const maxVy = Math.abs(b.vx) * maxVerticalRatio;
-
-      if (Math.abs(b.vy) > maxVy || forceEscape) {
-        const ySign = Math.sign(b.vy || rand(-1, 1));
-        b.vy = ySign * Math.min(Math.abs(b.vy), maxVy);
-      }
-
-      speed = hypot(b.vx, b.vy);
-
-      if (speed > maxSpeed) {
-        const scale = maxSpeed / speed;
-        b.vx *= scale;
-        b.vy *= scale;
-      }
-
-      if (forceEscape) {
-        b.spin *= 0.35;
-        b.wallBounceStreak = 0;
-        floatText(b.x, b.y, "ESCAPE", C.cyan);
-      }
-    }
-
-    function handleWallBounce(b, topWall) {
-      const now = performance.now();
-
-      if (!b.lastWallBounceAt || now - b.lastWallBounceAt > 1350) {
-        b.wallBounceStreak = 0;
-      }
-
-      b.lastWallBounceAt = now;
-      b.wallBounceStreak = (b.wallBounceStreak || 0) + 1;
-
-      if (topWall) {
-        b.y = 22 + b.r;
-        b.vy = Math.abs(b.vy);
-      } else {
-        b.y = H - 22 - b.r;
-        b.vy = -Math.abs(b.vy);
-      }
-
-      b.spin *= -0.86;
-
-      const tooVertical = Math.abs(b.vy) > Math.abs(b.vx) * 1.65;
-      const repeatedWallTrap = b.wallBounceStreak >= 3;
-
-      stabilizeBall(b, tooVertical || repeatedWallTrap);
-      burst(b.x, b.y, C.cyan, repeatedWallTrap ? 18 : 8);
-    }
-
     function collidePaddle(b, p, isPlayer) {
       const r = paddleRect(p);
-
       if (!rectCircle(r, b)) return;
       if (isPlayer && b.vx > 0) return;
       if (!isPlayer && b.vx < 0) return;
 
       const rel = clamp((b.y - p.y) / (p.h / 2), -1, 1);
-      const incomingSpeed = Math.max(360, hypot(b.vx, b.vy) * 1.035);
-      const angle = rel * 0.95;
+      const incomingSpeed = Math.max(CFG.ball.minSpeed, hypot(b.vx, b.vy) * 1.035);
+      const angle = rel * 0.90;
       const paddleSpin = clamp(p.vy / 620 + rel * 0.5, -1.7, 1.7) * (isPlayer ? state.mods.spinPower : 0.7);
 
       b.spin = clamp(b.spin * 0.25 + paddleSpin, -2.7, 2.7);
@@ -626,25 +580,14 @@
       b.lastHit = isPlayer ? "player" : "enemy";
       b.wallBounceStreak = 0;
       b.x = isPlayer ? r.x + r.w + b.r + 0.2 : r.x - b.r - 0.2;
-
       stabilizeBall(b);
-
       burst(b.x, b.y, isPlayer ? C.cyan : p.color, Math.abs(b.spin) > 0.65 ? 22 : 12);
-
-      if (Math.abs(b.spin) > 0.65) {
-        floatText(
-          b.x,
-          b.y - 18,
-          b.spin > 0 ? "TOPSPIN" : "BACKSPIN",
-          b.spin > 0 ? C.gold : C.purple
-        );
-      }
+      if (Math.abs(b.spin) > 0.65) floatText(b.x, b.y - 18, b.spin > 0 ? "TOPSPIN" : "BACKSPIN", b.spin > 0 ? C.gold : C.purple);
     }
 
     function collideBlocks(b) {
       for (let i = state.blocks.length - 1; i >= 0; i--) {
         const block = state.blocks[i];
-
         if (!rectCircle(block, b)) continue;
 
         const cx = block.x + block.w / 2;
@@ -665,7 +608,6 @@
         b.spin *= 0.92;
         b.wallBounceStreak = 0;
         stabilizeBall(b);
-
         block.hp -= 1;
         addScore(block.type === "stone" ? 28 : 18, cx, cy);
         burst(cx, cy, blockColor(block), 12);
@@ -678,36 +620,30 @@
           burst(b.x, b.y, C.purple, 20);
         }
 
-        if (block.type === "spike" && b.lastHit !== "player") {
-          hurtPlayer(1);
-        }
-
+        if (block.type === "spike" && b.lastHit !== "player") hurtPlayer(1);
         if (block.hp <= 0) {
           state.blocks.splice(i, 1);
+          scheduleBlockSpawn();
           addScore(block.type === "spike" ? 80 : block.type === "portal" ? 95 : 50, cx, cy, "BROKE");
         }
-
         return;
       }
     }
 
     function hurtPlayer(amount) {
       if (state.player.invuln > 0) return;
-
       if (state.mods.shield > 0) {
         state.mods.shield -= 1;
         floatText(90, state.player.y, "SHIELD", C.cyan);
         burst(state.player.x + 14, state.player.y, C.cyan, 28);
         return;
       }
-
       state.player.hp -= amount;
       state.player.invuln = 1;
       state.combo = 0;
       state.flash = 0.2;
       state.shake = 10;
       burst(state.player.x, state.player.y, C.pink, 34);
-
       if (state.player.hp <= 0) {
         state.mode = "gameover";
         saveBest();
@@ -720,21 +656,16 @@
         amount *= 2;
         floatText(x, y - 20, "CRIT", C.gold);
       }
-
       state.enemy.hp -= amount;
       state.enemy.stun = Math.max(state.enemy.stun, 0.12);
       state.shake = Math.max(state.shake, 4 + amount * 2);
       addScore(70 * amount, x, y, "-" + amount + " HP");
       burst(x, y, state.enemy.color, 20 + amount * 5);
-
       if (state.enemy.hp <= 0 && state.mode === "playing") {
         state.balls = [];
         addScore(250 + state.room * 50, W / 2, H / 2, "ROOM CLEAR");
         state.mode = "cleared";
-
-        setTimeout(() => {
-          if (state.mode === "cleared") createDraft();
-        }, 350);
+        setTimeout(() => { if (state.mode === "cleared") createDraft(); }, 350);
       }
     }
 
@@ -747,30 +678,14 @@
     }
 
     function floatText(x, y, text, color) {
-      state.floats.push({
-        x,
-        y,
-        text,
-        color,
-        life: 0.82,
-        vy: -38
-      });
+      state.floats.push({ x, y, text, color, life: 0.82, vy: -38 });
     }
 
     function burst(x, y, color, count) {
       for (let i = 0; i < count; i++) {
         const a = rand(0, Math.PI * 2);
         const s = rand(35, 240);
-
-        state.particles.push({
-          x,
-          y,
-          vx: Math.cos(a) * s,
-          vy: Math.sin(a) * s,
-          r: rand(1.2, 3.4),
-          color,
-          life: rand(0.25, 0.85)
-        });
+        state.particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, r: rand(1.2, 3.4), color, life: rand(0.25, 0.85) });
       }
     }
 
@@ -782,14 +697,11 @@
         p.vy *= Math.pow(0.06, dt);
         p.life -= dt;
       }
-
       state.particles = state.particles.filter(p => p.life > 0);
-
       for (const f of state.floats) {
         f.y += f.vy * dt;
         f.life -= dt;
       }
-
       state.floats = state.floats.filter(f => f.life > 0);
     }
 
@@ -801,29 +713,25 @@
     }
 
     function draw() {
+      ctx.clearRect(0, 0, W, H);
       const sx = state.shake ? rand(-state.shake, state.shake) : 0;
       const sy = state.shake ? rand(-state.shake, state.shake) : 0;
-
       ctx.save();
       ctx.translate(sx, sy);
-
       drawBackground();
       drawArena();
+      drawPreviews();
       drawBlocks();
-
       if (state.player && state.enemy) drawPaddles();
-
       drawBalls();
       drawEffects();
       drawHud();
-
       ctx.restore();
 
       if (state.flash > 0) {
         ctx.fillStyle = `rgba(255,95,126,${state.flash})`;
         ctx.fillRect(0, 0, W, H);
       }
-
       if (state.mode === "title") drawTitle();
       if (state.mode === "upgrade") drawUpgrade();
       if (state.mode === "gameover") drawEnd(false);
@@ -833,101 +741,103 @@
 
     function drawBackground() {
       const g = ctx.createLinearGradient(0, 0, W, H);
-
       g.addColorStop(0, "#101735");
-      g.addColorStop(0.55, "#070914");
+      g.addColorStop(0.56, "#070914");
       g.addColorStop(1, "#16091c");
-
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, W, H);
-
       ctx.save();
-      ctx.globalAlpha = 0.16;
+      ctx.globalAlpha = 0.15;
       ctx.strokeStyle = C.cyan;
-
-      for (let x = -80; x < W + 120; x += 48) {
+      for (let x = -H; x < W + H; x += 48) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
-        ctx.lineTo(x - 115, H);
+        ctx.lineTo(x - H * 0.22, H);
         ctx.stroke();
       }
-
       ctx.restore();
     }
 
     function drawArena() {
       ctx.save();
-
       ctx.strokeStyle = "rgba(255,255,255,0.16)";
       ctx.lineWidth = 2;
-
-      rounded(16, 16, W - 32, H - 32, 22);
+      rounded(CFG.arena.pad, CFG.arena.pad, W - CFG.arena.pad * 2, H - CFG.arena.pad * 2, 22);
       ctx.stroke();
-
       ctx.setLineDash([8, 14]);
       ctx.beginPath();
       ctx.moveTo(W / 2, 30);
       ctx.lineTo(W / 2, H - 30);
       ctx.stroke();
-
       ctx.restore();
     }
 
-    function drawBlocks() {
-      for (const b of state.blocks) {
+    function drawPreviews() {
+      for (const p of state.previews) {
+        const ratio = clamp(1 - p.time / p.total, 0, 1);
+        const color = blockColor(p);
         ctx.save();
-
-        const color = blockColor(b);
-
-        ctx.shadowColor = color;
-        ctx.shadowBlur = b.type === "portal" ? 18 : 8;
+        ctx.globalAlpha = 0.22 + ratio * 0.35 + Math.sin(performance.now() / 120) * 0.06;
+        ctx.strokeStyle = color;
         ctx.fillStyle = color;
-        ctx.globalAlpha = b.type === "stone" ? 0.75 : 0.9;
-
-        rounded(b.x, b.y, b.w, b.h, 7);
-        ctx.fill();
-
-        ctx.globalAlpha = 1;
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = "rgba(255,255,255,0.24)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([7, 7]);
+        rounded(p.x, p.y, p.w, p.h, 7);
         ctx.stroke();
-
-        if (b.maxHp > 1) {
-          ctx.fillStyle = "rgba(0,0,0,0.36)";
-          ctx.fillRect(b.x + 6, b.y + b.h - 7, b.w - 12, 3);
-
-          ctx.fillStyle = C.text;
-          ctx.fillRect(b.x + 6, b.y + b.h - 7, (b.w - 12) * b.hp / b.maxHp, 3);
-        }
-
-        if (b.type === "spike") {
-          ctx.fillStyle = "rgba(0,0,0,0.38)";
-
-          for (let i = 0; i < 3; i++) {
-            ctx.beginPath();
-            ctx.moveTo(b.x + 9 + i * 12, b.y + b.h - 5);
-            ctx.lineTo(b.x + 15 + i * 12, b.y + 6);
-            ctx.lineTo(b.x + 21 + i * 12, b.y + b.h - 5);
-            ctx.fill();
-          }
-        }
-
-        if (b.type === "portal") {
-          ctx.strokeStyle = "rgba(255,255,255,0.76)";
-          ctx.beginPath();
-          ctx.ellipse(b.x + b.w / 2, b.y + b.h / 2, 13, 7, performance.now() / 350, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-
+        ctx.globalAlpha = 0.10 + ratio * 0.18;
+        ctx.fill();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 0.95;
+        ctx.fillStyle = C.text;
+        ctx.font = "800 11px ui-sans-serif, system-ui";
+        ctx.textAlign = "center";
+        ctx.fillText(p.time.toFixed(1), p.x + p.w / 2, p.y - 7);
         ctx.restore();
       }
     }
 
-    function blockColor(b) {
-      if (b.type === "stone") return "#858da9";
-      if (b.type === "spike") return C.pink;
-      if (b.type === "portal") return C.purple;
-      return C.gold;
+    function drawBlocks() {
+      for (const b of state.blocks) {
+        const color = blockColor(b);
+        ctx.save();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = b.type === "portal" ? 18 : 8;
+        ctx.fillStyle = color;
+        ctx.globalAlpha = b.type === "stone" ? 0.75 : 0.9;
+        rounded(b.x, b.y, b.w, b.h, 7);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "rgba(255,255,255,0.24)";
+        ctx.stroke();
+        if (b.maxHp > 1) {
+          ctx.fillStyle = "rgba(0,0,0,0.36)";
+          ctx.fillRect(b.x + 6, b.y + b.h - 7, b.w - 12, 3);
+          ctx.fillStyle = C.text;
+          ctx.fillRect(b.x + 6, b.y + b.h - 7, (b.w - 12) * b.hp / b.maxHp, 3);
+        }
+        if (b.type === "spike") drawSpikes(b);
+        if (b.type === "portal") drawPortal(b);
+        ctx.restore();
+      }
+    }
+
+    function drawSpikes(b) {
+      ctx.fillStyle = "rgba(0,0,0,0.38)";
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(b.x + 9 + i * 12, b.y + b.h - 5);
+        ctx.lineTo(b.x + 15 + i * 12, b.y + 6);
+        ctx.lineTo(b.x + 21 + i * 12, b.y + b.h - 5);
+        ctx.fill();
+      }
+    }
+
+    function drawPortal(b) {
+      ctx.strokeStyle = "rgba(255,255,255,0.76)";
+      ctx.beginPath();
+      ctx.ellipse(b.x + b.w / 2, b.y + b.h / 2, 13, 7, performance.now() / 350, 0, Math.PI * 2);
+      ctx.stroke();
     }
 
     function drawPaddles() {
@@ -937,21 +847,16 @@
 
     function drawPaddle(p, alpha) {
       const r = paddleRect(p);
-
       ctx.save();
-
       ctx.globalAlpha = alpha;
       ctx.shadowColor = p.color;
       ctx.shadowBlur = 18;
-
       const g = ctx.createLinearGradient(r.x, r.y, r.x + r.w, r.y + r.h);
       g.addColorStop(0, p.color);
       g.addColorStop(1, "#ffffff");
-
       ctx.fillStyle = g;
       rounded(r.x, r.y, r.w, r.h, 8);
       ctx.fill();
-
       ctx.restore();
     }
 
@@ -959,7 +864,6 @@
       for (const b of state.balls) {
         for (let i = 0; i < b.trail.length; i++) {
           const t = b.trail[i];
-
           ctx.save();
           ctx.globalAlpha = (i / b.trail.length) * 0.23;
           ctx.fillStyle = Math.abs(b.spin) > 0.7 ? C.gold : C.cyan;
@@ -968,37 +872,32 @@
           ctx.fill();
           ctx.restore();
         }
-
         ctx.save();
-
         ctx.shadowColor = Math.abs(b.spin) > 0.7 ? C.gold : C.cyan;
         ctx.shadowBlur = 22;
-
         const g = ctx.createRadialGradient(b.x - 3, b.y - 3, 1, b.x, b.y, b.r + 5);
         g.addColorStop(0, "#ffffff");
         g.addColorStop(0.5, C.cyan);
         g.addColorStop(1, "rgba(255,255,255,0.16)");
-
         ctx.fillStyle = g;
         ctx.beginPath();
         ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
         ctx.fill();
-
-        if (Math.abs(b.spin) > 0.06) {
-          const dir = b.spin > 0 ? 1 : -1;
-          const a = performance.now() / 120 * dir;
-
-          ctx.globalAlpha = clamp(Math.abs(b.spin) / 2.5, 0.24, 0.95);
-          ctx.shadowBlur = 0;
-          ctx.strokeStyle = b.spin > 0 ? C.gold : C.purple;
-          ctx.lineWidth = 2.2;
-          ctx.beginPath();
-          ctx.arc(b.x, b.y, b.r + 5, a, a + Math.PI * 1.25);
-          ctx.stroke();
-        }
-
+        if (Math.abs(b.spin) > 0.06) drawSpinRing(b);
         ctx.restore();
       }
+    }
+
+    function drawSpinRing(b) {
+      const dir = b.spin > 0 ? 1 : -1;
+      const a = performance.now() / 120 * dir;
+      ctx.globalAlpha = clamp(Math.abs(b.spin) / 2.5, 0.24, 0.95);
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = b.spin > 0 ? C.gold : C.purple;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r + 5, a, a + Math.PI * 1.25);
+      ctx.stroke();
     }
 
     function drawEffects() {
@@ -1011,7 +910,6 @@
         ctx.fill();
         ctx.restore();
       }
-
       for (const f of state.floats) {
         ctx.save();
         ctx.globalAlpha = clamp(f.life * 1.25, 0, 1);
@@ -1025,223 +923,188 @@
 
     function drawHud() {
       if (!state.player || !state.enemy) return;
-
+      const hudW = Math.min(760, W - 36);
+      const x = 18;
+      const y = 18;
       ctx.save();
-
       ctx.fillStyle = "rgba(0,0,0,0.28)";
-      rounded(24, 22, W - 48, 58, 16);
+      rounded(x, y, hudW, 58, 16);
       ctx.fill();
-
       ctx.strokeStyle = "rgba(255,255,255,0.14)";
       ctx.stroke();
-
       ctx.fillStyle = C.text;
-      ctx.font = "900 18px ui-sans-serif, system-ui";
+      ctx.font = "900 16px ui-sans-serif, system-ui";
       ctx.textAlign = "left";
-      ctx.fillText("Room " + state.room + "/12", 42, 56);
-
-      drawHearts(158, 52);
-
-      const ex = 340;
-      const ey = 43;
-      const ew = 280;
-      const eh = 10;
-
-      ctx.fillStyle = "rgba(255,255,255,0.12)";
-      rounded(ex, ey, ew, eh, 7);
-      ctx.fill();
-
-      ctx.fillStyle = state.enemy.color;
-      rounded(ex, ey, ew * clamp(state.enemy.hp / state.enemy.maxHp, 0, 1), eh, 7);
-      ctx.fill();
-
-      ctx.fillStyle = C.muted;
-      ctx.font = "700 12px ui-sans-serif, system-ui";
-      ctx.textAlign = "center";
-      ctx.fillText("Enemy " + Math.max(0, state.enemy.hp) + "/" + state.enemy.maxHp, ex + ew / 2, ey + 28);
-
+      ctx.fillText("Room " + state.room + "/" + CFG.room.max, x + 18, y + 35);
+      drawHearts(x + 120, y + 31);
+      drawEnemyBar(x + 280, y + 20, Math.min(260, hudW - 460));
       ctx.textAlign = "right";
       ctx.fillStyle = C.gold;
-      ctx.font = "900 18px ui-sans-serif, system-ui";
-      ctx.fillText(String(state.score).padStart(6, "0"), W - 42, 48);
-
+      ctx.font = "900 17px ui-sans-serif, system-ui";
+      ctx.fillText(String(state.score).padStart(6, "0"), x + hudW - 18, y + 28);
       ctx.fillStyle = C.muted;
-      ctx.font = "700 12px ui-sans-serif, system-ui";
-      ctx.fillText("BEST " + state.best, W - 42, 66);
-
-      const spin = state.balls.reduce((m, b) => Math.abs(b.spin) > Math.abs(m) ? b.spin : m, 0);
-
-      if (Math.abs(spin) > 0.08) {
-        ctx.textAlign = "left";
-        ctx.fillStyle = spin > 0 ? C.gold : C.purple;
-        ctx.font = "900 13px ui-sans-serif, system-ui";
-        ctx.fillText("SPIN " + (spin > 0 ? "↻" : "↺"), 42, 100);
-
-        ctx.fillStyle = "rgba(255,255,255,0.14)";
-        rounded(104, 90, 86, 8, 5);
-        ctx.fill();
-
-        ctx.fillStyle = spin > 0 ? C.gold : C.purple;
-        rounded(104, 90, 86 * clamp(Math.abs(spin) / 2.7, 0, 1), 8, 5);
-        ctx.fill();
-      }
-
-      if (state.mods && state.mods.shield > 0) {
-        ctx.textAlign = "left";
-        ctx.fillStyle = C.cyan;
-        ctx.font = "900 13px ui-sans-serif, system-ui";
-        ctx.fillText("SHIELD × " + state.mods.shield, 42, 120);
-      }
-
+      ctx.font = "700 11px ui-sans-serif, system-ui";
+      ctx.fillText("BEST " + state.best, x + hudW - 18, y + 45);
+      drawSpinHud(x + 18, y + 82);
       if (state.messageTimer > 0) {
         ctx.textAlign = "center";
         ctx.fillStyle = `rgba(245,247,255,${clamp(state.messageTimer, 0, 1)})`;
         ctx.font = "900 42px ui-sans-serif, system-ui";
         ctx.fillText(state.message, W / 2, H / 2 - 116);
       }
-
       ctx.restore();
+    }
+
+    function drawEnemyBar(x, y, w) {
+      if (w < 80) return;
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
+      rounded(x, y, w, 10, 7);
+      ctx.fill();
+      ctx.fillStyle = state.enemy.color;
+      rounded(x, y, w * clamp(state.enemy.hp / state.enemy.maxHp, 0, 1), 10, 7);
+      ctx.fill();
+      ctx.fillStyle = C.muted;
+      ctx.font = "700 11px ui-sans-serif, system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("Enemy " + Math.max(0, state.enemy.hp) + "/" + state.enemy.maxHp, x + w / 2, y + 28);
+    }
+
+    function drawSpinHud(x, y) {
+      const spin = state.balls.reduce((m, b) => Math.abs(b.spin) > Math.abs(m) ? b.spin : m, 0);
+      if (Math.abs(spin) <= 0.08 && !(state.mods && state.mods.shield > 0)) return;
+      if (Math.abs(spin) > 0.08) {
+        ctx.textAlign = "left";
+        ctx.fillStyle = spin > 0 ? C.gold : C.purple;
+        ctx.font = "900 13px ui-sans-serif, system-ui";
+        ctx.fillText("SPIN " + (spin > 0 ? "↻" : "↺"), x, y);
+        ctx.fillStyle = "rgba(255,255,255,0.14)";
+        rounded(x + 62, y - 10, 86, 8, 5);
+        ctx.fill();
+        ctx.fillStyle = spin > 0 ? C.gold : C.purple;
+        rounded(x + 62, y - 10, 86 * clamp(Math.abs(spin) / 2.7, 0, 1), 8, 5);
+        ctx.fill();
+      }
+      if (state.mods && state.mods.shield > 0) {
+        ctx.fillStyle = C.cyan;
+        ctx.font = "900 13px ui-sans-serif, system-ui";
+        ctx.fillText("SHIELD × " + state.mods.shield, x, y + 20);
+      }
     }
 
     function drawHearts(x, y) {
       for (let i = 0; i < state.mods.maxHp; i++) {
         ctx.fillStyle = i < state.player.hp ? C.pink : "rgba(255,255,255,0.16)";
-        heart(x + i * 22, y, 8);
+        heart(x + i * 20, y, 7.5);
         ctx.fill();
       }
     }
 
     function drawTitle() {
-      overlay(0.74);
-
+      overlay(0.75);
       ctx.save();
       ctx.textAlign = "center";
-
       ctx.fillStyle = C.text;
-      ctx.font = "900 62px ui-sans-serif, system-ui";
-      ctx.fillText("Rogue Pong", W / 2, 176);
-
+      ctx.font = `900 ${clamp(W * 0.07, 42, 76)}px ui-sans-serif, system-ui`;
+      ctx.fillText("Rogue Pong", W / 2, H * 0.28);
       ctx.fillStyle = C.cyan;
       ctx.font = "900 23px ui-sans-serif, system-ui";
-      ctx.fillText("Spin Dungeon", W / 2, 214);
-
+      ctx.fillText("Spin Dungeon", W / 2, H * 0.28 + 42);
       ctx.fillStyle = C.muted;
       ctx.font = "600 18px ui-sans-serif, system-ui";
-      wrapText(
-        "Click Start, press Space, or tap the arena. Move your paddle while hitting the ball to add topspin or backspin. Clear rooms and draft relics.",
-        W / 2,
-        272,
-        660,
-        28
-      );
-
-      drawButton(W / 2 - 132, 356, 264, 58, "Start game", C.cyan);
-
-      ctx.fillStyle = C.muted;
-      ctx.font = "700 14px ui-sans-serif, system-ui";
-      ctx.fillText("Keyboard, mouse, and touch are all active on this screen.", W / 2, 456);
-
+      wrapText("Full-window roguelike pong. Move while hitting to curve the ball. Blocks respawn at revealed positions, faster in higher rooms.", W / 2, H * 0.44, Math.min(700, W - 50), 28);
+      drawButton(W / 2 - 132, H * 0.62, 264, 58, "Start game", C.cyan);
       ctx.restore();
     }
 
     function drawUpgrade() {
-      overlay(0.76);
-
+      overlay(0.78);
       ctx.save();
       ctx.textAlign = "center";
-
       ctx.fillStyle = C.text;
       ctx.font = "900 44px ui-sans-serif, system-ui";
-      ctx.fillText("Choose a Relic", W / 2, 126);
-
+      ctx.fillText("Choose a Relic", W / 2, 92);
       ctx.fillStyle = C.muted;
       ctx.font = "700 16px ui-sans-serif, system-ui";
-      ctx.fillText("Click a card or press 1, 2, or 3.", W / 2, 156);
+      ctx.fillText("Click a card or press 1, 2, or 3.", W / 2, 122);
 
-      const cardW = 250;
-      const gap = 22;
-      const y = 210;
-      const startX = W / 2 - (cardW * 3 + gap * 2) / 2;
+      const compact = W < 820;
+      const cardW = compact ? Math.min(280, W - 40) : 250;
+      const cardH = compact ? 132 : 220;
+      const gap = 18;
+      const startX = compact ? W / 2 - cardW / 2 : W / 2 - (cardW * 3 + gap * 2) / 2;
+      const startY = compact ? 150 : 180;
 
       state.draft.forEach((r, i) => {
-        const x = startX + i * (cardW + gap);
-
-        ctx.save();
-
-        ctx.fillStyle = "rgba(14,18,37,0.94)";
-        ctx.strokeStyle = "rgba(255,255,255,0.18)";
-        ctx.lineWidth = 2;
-
-        rounded(x, y, cardW, 236, 18);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = C.gold;
-        ctx.font = "900 48px ui-sans-serif, system-ui";
-        ctx.fillText(r.icon, x + cardW / 2, y + 70);
-
-        ctx.fillStyle = C.text;
-        ctx.font = "900 23px ui-sans-serif, system-ui";
-        ctx.fillText((i + 1) + ". " + r.name, x + cardW / 2, y + 114);
-
-        ctx.fillStyle = C.muted;
-        ctx.font = "700 15px ui-sans-serif, system-ui";
-        wrapText(r.desc, x + cardW / 2, y + 154, cardW - 46, 22);
-
-        ctx.fillStyle = "rgba(128,247,255,0.14)";
-        rounded(x + 54, y + 188, cardW - 108, 34, 10);
-        ctx.fill();
-
-        ctx.fillStyle = C.cyan;
-        ctx.font = "900 13px ui-sans-serif, system-ui";
-        ctx.fillText("PRESS " + (i + 1), x + cardW / 2, y + 210);
-
-        ctx.restore();
+        const x = compact ? startX : startX + i * (cardW + gap);
+        const y = compact ? startY + i * (cardH + 14) : startY;
+        drawRelicCard(r, i, x, y, cardW, cardH, compact);
       });
+      ctx.restore();
+    }
 
+    function drawRelicCard(r, i, x, y, w, h, compact) {
+      ctx.save();
+      ctx.fillStyle = "rgba(14,18,37,0.94)";
+      ctx.strokeStyle = "rgba(255,255,255,0.18)";
+      ctx.lineWidth = 2;
+      rounded(x, y, w, h, 18);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = C.gold;
+      ctx.font = compact ? "900 34px ui-sans-serif, system-ui" : "900 48px ui-sans-serif, system-ui";
+      ctx.fillText(r.icon, x + w / 2, y + (compact ? 42 : 64));
+      ctx.fillStyle = C.text;
+      ctx.font = compact ? "900 18px ui-sans-serif, system-ui" : "900 22px ui-sans-serif, system-ui";
+      ctx.fillText((i + 1) + ". " + r.name, x + w / 2, y + (compact ? 72 : 106));
+      ctx.fillStyle = C.muted;
+      ctx.font = compact ? "700 13px ui-sans-serif, system-ui" : "700 15px ui-sans-serif, system-ui";
+      wrapText(r.desc, x + w / 2, y + (compact ? 98 : 144), w - 42, compact ? 18 : 22);
       ctx.restore();
     }
 
     function drawEnd(victory) {
-      overlay(0.75);
-
+      overlay(0.76);
       ctx.save();
       ctx.textAlign = "center";
-
       ctx.fillStyle = victory ? C.gold : C.pink;
-      ctx.font = "900 58px ui-sans-serif, system-ui";
-      ctx.fillText(victory ? "Dungeon Cleared" : "Run Ended", W / 2, 190);
-
+      ctx.font = `900 ${clamp(W * 0.06, 42, 64)}px ui-sans-serif, system-ui`;
+      ctx.fillText(victory ? "Dungeon Cleared" : "Run Ended", W / 2, H * 0.32);
       ctx.fillStyle = C.text;
       ctx.font = "900 26px ui-sans-serif, system-ui";
-      ctx.fillText("Score " + state.score + " · Best " + state.best, W / 2, 238);
-
-      ctx.fillStyle = C.muted;
-      ctx.font = "700 17px ui-sans-serif, system-ui";
-      ctx.fillText("Rooms reached: " + state.room + " · Relics: " + state.relics.length, W / 2, 274);
-
-      drawButton(W / 2 - 120, 345, 240, 54, "Restart", victory ? C.gold : C.pink);
-
-      ctx.fillStyle = C.muted;
-      ctx.font = "700 14px ui-sans-serif, system-ui";
-      ctx.fillText("Press R, Space, or click Restart", W / 2, 430);
-
+      ctx.fillText("Score " + state.score + " · Best " + state.best, W / 2, H * 0.32 + 50);
+      drawButton(W / 2 - 120, H * 0.54, 240, 54, "Restart", victory ? C.gold : C.pink);
       ctx.restore();
     }
 
     function drawPause() {
-      overlay(0.58);
-
+      overlay(0.68);
       ctx.save();
       ctx.textAlign = "center";
       ctx.fillStyle = C.text;
       ctx.font = "900 54px ui-sans-serif, system-ui";
-      ctx.fillText("Paused", W / 2, H / 2 - 8);
-
-      ctx.fillStyle = C.muted;
-      ctx.font = "700 18px ui-sans-serif, system-ui";
-      ctx.fillText("Press P to resume", W / 2, H / 2 + 36);
-
+      ctx.fillText("Paused", W / 2, H * 0.25);
+      const lines = [
+        "Controls",
+        "W/S or ↑/↓: move paddle",
+        "Mouse/touch: move paddle after pointer moves",
+        "Move while hitting: add topspin/backspin",
+        "1/2/3: choose relic",
+        "P: resume · R: restart"
+      ];
+      const boxW = Math.min(520, W - 38);
+      const boxH = 232;
+      const boxX = W / 2 - boxW / 2;
+      const boxY = H * 0.34;
+      ctx.fillStyle = "rgba(14,18,37,0.92)";
+      rounded(boxX, boxY, boxW, boxH, 18);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.18)";
+      ctx.stroke();
+      lines.forEach((line, i) => {
+        ctx.fillStyle = i === 0 ? C.cyan : C.muted;
+        ctx.font = i === 0 ? "900 20px ui-sans-serif, system-ui" : "700 16px ui-sans-serif, system-ui";
+        ctx.fillText(line, W / 2, boxY + 40 + i * 31);
+      });
       ctx.restore();
     }
 
@@ -1252,30 +1115,24 @@
 
     function drawButton(x, y, w, h, text, color) {
       ctx.save();
-
       ctx.shadowColor = color;
       ctx.shadowBlur = 18;
       ctx.fillStyle = color;
-
       rounded(x, y, w, h, 16);
       ctx.fill();
-
       ctx.shadowBlur = 0;
       ctx.fillStyle = "rgba(0,0,0,0.72)";
       ctx.font = "900 18px ui-sans-serif, system-ui";
       ctx.textAlign = "center";
       ctx.fillText(text, x + w / 2, y + h / 2 + 6);
-
       ctx.restore();
     }
 
     function wrapText(text, x, y, maxWidth, lineHeight) {
       const words = text.split(" ");
       let line = "";
-
       for (const word of words) {
         const test = line + word + " ";
-
         if (ctx.measureText(test).width > maxWidth && line) {
           ctx.fillText(line.trim(), x, y);
           line = word + " ";
@@ -1284,13 +1141,11 @@
           line = test;
         }
       }
-
       ctx.fillText(line.trim(), x, y);
     }
 
     function rounded(x, y, w, h, r) {
       r = Math.min(r, w / 2, h / 2);
-
       ctx.beginPath();
       ctx.moveTo(x + r, y);
       ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -1310,11 +1165,7 @@
 
     function canvasPoint(event) {
       const rect = canvas.getBoundingClientRect();
-
-      return {
-        x: (event.clientX - rect.left) * W / rect.width,
-        y: (event.clientY - rect.top) * H / rect.height
-      };
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
     }
 
     function clickAt(x, y) {
@@ -1324,17 +1175,16 @@
       }
 
       if (state.mode === "upgrade") {
-        const cardW = 250;
-        const gap = 22;
-        const cardY = 210;
-        const startX = W / 2 - (cardW * 3 + gap * 2) / 2;
-
+        const compact = W < 820;
+        const cardW = compact ? Math.min(280, W - 40) : 250;
+        const cardH = compact ? 132 : 220;
+        const gap = 18;
+        const startX = compact ? W / 2 - cardW / 2 : W / 2 - (cardW * 3 + gap * 2) / 2;
+        const startY = compact ? 150 : 180;
         for (let i = 0; i < 3; i++) {
-          const cardX = startX + i * (cardW + gap);
-
-          if (x >= cardX && x <= cardX + cardW && y >= cardY && y <= cardY + 236) {
-            chooseRelic(i);
-          }
+          const cardX = compact ? startX : startX + i * (cardW + gap);
+          const cardY = compact ? startY + i * (cardH + 14) : startY;
+          if (x >= cardX && x <= cardX + cardW && y >= cardY && y <= cardY + cardH) chooseRelic(i);
         }
       }
     }
@@ -1351,26 +1201,35 @@
       }
     }
 
+    function activateKeyboardInput() {
+      pointer.mode = "keyboard";
+      pointer.active = false;
+    }
+
+    function updatePointer(event, force = false) {
+      const p = canvasPoint(event);
+      const moved = pointer.lastX === null || Math.hypot(p.x - pointer.lastX, p.y - pointer.lastY) > 2;
+      pointer.lastX = p.x;
+      pointer.lastY = p.y;
+      if (force || moved) {
+        pointer.mode = "mouse";
+        pointer.active = true;
+        pointer.y = p.y;
+      }
+      return p;
+    }
+
     actionButton.addEventListener("click", () => newRun());
 
     canvas.addEventListener("pointerdown", event => {
-      const p = canvasPoint(event);
-
-      pointer.active = true;
-      pointer.y = p.y;
-
+      const p = updatePointer(event, true);
       clickAt(p.x, p.y);
       canvas.focus();
-
       event.preventDefault();
     });
 
     canvas.addEventListener("pointermove", event => {
-      const p = canvasPoint(event);
-
-      pointer.active = true;
-      pointer.y = p.y;
-
+      updatePointer(event, false);
       event.preventDefault();
     });
 
@@ -1382,29 +1241,16 @@
 
     window.addEventListener("keydown", event => {
       keys.add(event.code);
-
-      if (["Space", "ArrowUp", "ArrowDown"].includes(event.code)) {
-        event.preventDefault();
-      }
+      if (["KeyW", "KeyS", "ArrowUp", "ArrowDown"].includes(event.code)) activateKeyboardInput();
+      if (["Space", "ArrowUp", "ArrowDown"].includes(event.code)) event.preventDefault();
 
       if (event.code === "Space") {
-        if (state.mode === "title" || state.mode === "gameover" || state.mode === "victory") {
-          newRun();
-        } else if (state.mode === "playing" && state.balls.length === 0) {
-          serve(1);
-        }
+        if (state.mode === "title" || state.mode === "gameover" || state.mode === "victory") newRun();
+        else if (state.mode === "playing" && state.balls.length === 0) serve(1);
       }
-
       if (event.code === "KeyR") newRun();
-
-      if (event.code === "KeyP" && state.mode === "playing") {
-        state.paused = !state.paused;
-      }
-
-      if (
-        state.mode === "upgrade" &&
-        ["Digit1", "Digit2", "Digit3", "Numpad1", "Numpad2", "Numpad3"].includes(event.code)
-      ) {
+      if (event.code === "KeyP" && state.mode === "playing") state.paused = !state.paused;
+      if (state.mode === "upgrade" && ["Digit1", "Digit2", "Digit3", "Numpad1", "Numpad2", "Numpad3"].includes(event.code)) {
         chooseRelic(Number(event.code.replace("Digit", "").replace("Numpad", "")) - 1);
       }
     });
@@ -1416,16 +1262,18 @@
       if (state.mode === "playing") state.paused = true;
     });
 
+    window.addEventListener("resize", resize);
+    window.addEventListener("orientationchange", resize);
+
     function loop(t) {
       const dt = Math.min(0.033, (t - state.last) / 1000 || 0);
       state.last = t;
-
       update(dt);
       draw();
-
       requestAnimationFrame(loop);
     }
 
+    resize();
     syncActionButton();
     draw();
     requestAnimationFrame(loop);
