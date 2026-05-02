@@ -1,9 +1,10 @@
+```html id="thats-a-paddlin-full"
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Spinstate Rally</title>
+  <title>that's a paddlin</title>
   <style>
     * { box-sizing: border-box; }
 
@@ -51,7 +52,7 @@
   </style>
 </head>
 <body>
-<canvas id="game" tabindex="0" aria-label="Spinstate Rally game canvas"></canvas>
+<canvas id="game" tabindex="0" aria-label="that's a paddlin game canvas"></canvas>
 <button id="actionButton" type="button">Start game</button>
 
 <script>
@@ -97,7 +98,8 @@
       angleFollow: 12,
       angleFromMoveX: 0.36,
       angleFromMoveY: 0.95,
-      angleInputSpeed: 1.55
+      angleInputSpeed: 1.55,
+      maxAngle: Math.PI * 160 / 180
     },
 
     ball: {
@@ -178,7 +180,7 @@
     paused: false,
     room: 1,
     score: 0,
-    best: store.get("spinstate-rally-best", 0),
+    best: store.get("thats-a-paddlin-best", 0),
     combo: 0,
     comboTimer: 0,
     last: performance.now(),
@@ -586,6 +588,7 @@
       const fast = keys.has("ShiftLeft") || keys.has("ShiftRight") ? 1.85 : 1;
       p.angleLocked = true;
       p.manualAngle += dir * CFG.paddle.angleInputSpeed * fast * dt;
+      p.manualAngle = clamp(p.manualAngle, -CFG.paddle.maxAngle, CFG.paddle.maxAngle);
     }
 
     let target;
@@ -593,17 +596,16 @@
     if (p.angleLocked) {
       target = p.manualAngle;
     } else {
-      /*
-        No hard 45° clamp.
-        Fast X/Y motion can tilt the paddle beyond the previous limit.
-      */
       target = Math.atan2(
         p.vy * CFG.paddle.angleFromMoveY - p.vx * CFG.paddle.angleFromMoveX,
         420
       ) * 1.7;
+
+      target = clamp(target, -CFG.paddle.maxAngle, CFG.paddle.maxAngle);
     }
 
     p.angle += (target - p.angle) * clamp(dt * CFG.paddle.angleFollow, 0, 1);
+    p.angle = clamp(p.angle, -CFG.paddle.maxAngle, CFG.paddle.maxAngle);
   }
 
   function updateEnemy(dt) {
@@ -706,36 +708,22 @@
       return;
     }
 
-    let sp = speedOf(b);
+    const sp = speedOf(b);
 
     if (sp < CFG.ball.minSpeed) {
       const s = CFG.ball.minSpeed / Math.max(sp, 1);
       b.vx *= s;
       b.vy *= s;
-      sp = CFG.ball.minSpeed;
     }
 
     if (force) {
       escapeBall(b);
-      return;
-    }
-
-    const dir = b.vx < 0 ? -1 : 1;
-    const minVx = sp * CFG.ball.minHorizontalRatio;
-
-    if (Math.abs(b.vx) < minVx) {
-      b.vx = dir * minVx;
-    }
-
-    const maxVy = Math.abs(b.vx) * CFG.ball.maxVerticalRatio;
-
-    if (Math.abs(b.vy) > maxVy) {
-      b.vy = Math.sign(b.vy || rand(-1, 1)) * maxVy;
     }
 
     /*
-      No max-speed normalization.
-      This intentionally leaves high-speed states uncapped.
+      No trajectory-angle limiting here.
+      The ball can now travel at steep, shallow, vertical, or near-horizontal angles.
+      Anti-stuck behavior is handled separately by wallBounce() and updateCenterStall().
     */
   }
 
@@ -818,7 +806,7 @@
     }
 
     applyWallSpin(b, top);
-    stabilize(b, b.wallBounceStreak >= 2 || Math.abs(b.vy) > Math.abs(b.vx) * 1.22);
+    stabilize(b, b.wallBounceStreak >= 3);
     burst(b.x, b.y, C.cyan, b.wallBounceStreak >= 2 ? 18 : 8);
   }
 
@@ -1139,7 +1127,7 @@
   function saveBest() {
     if (state.score > state.best) {
       state.best = state.score;
-      store.set("spinstate-rally-best", state.best);
+      store.set("thats-a-paddlin-best", state.best);
     }
   }
 
@@ -1450,20 +1438,21 @@
   function drawHud() {
     if (!state.player || !state.enemy) return;
 
-    const w = Math.min(990, W - 28);
+    const w = Math.min(Math.max(560, W * 0.54), W - 28);
+    const h = W < 760 ? 128 : 96;
     const x = W / 2 - w / 2;
-    const y = 16;
+    const y = 10;
 
     ctx.save();
     ctx.fillStyle = "rgba(0,0,0,0.34)";
-    round(x, y, w, 140, 18);
+    round(x, y, w, h, 14);
     ctx.fill();
 
     ctx.strokeStyle = "rgba(255,255,255,0.14)";
     ctx.stroke();
 
     drawStats(x, y, w);
-    drawPhysics(x, y + 62, w);
+    drawPhysics(x, y + 40, w);
 
     if (state.messageTimer > 0) {
       ctx.textAlign = "center";
@@ -1480,59 +1469,60 @@
 
     ctx.textAlign = "center";
     ctx.fillStyle = C.text;
-    ctx.font = "900 16px ui-sans-serif, system-ui";
-    ctx.fillText("Room " + state.room + "/" + CFG.rooms, c - 340, y + 27);
+    ctx.font = "900 13px ui-sans-serif, system-ui";
+    ctx.fillText("Room " + state.room + "/" + CFG.rooms, c - w * 0.38, y + 20);
 
-    drawHearts(c - 260, y + 24);
-    drawEnemyBar(c - 72, y + 17, 205);
+    drawHearts(c - w * 0.27, y + 18);
+    drawEnemyBar(c - w * 0.07, y + 12, Math.min(150, w * 0.22));
 
     ctx.fillStyle = C.gold;
-    ctx.font = "900 17px ui-sans-serif, system-ui";
-    ctx.fillText(String(state.score).padStart(6, "0"), c + 270, y + 27);
+    ctx.font = "900 14px ui-sans-serif, system-ui";
+    ctx.fillText(String(state.score).padStart(6, "0"), c + w * 0.31, y + 20);
 
     ctx.fillStyle = C.muted;
-    ctx.font = "700 11px ui-sans-serif, system-ui";
-    ctx.fillText("BEST " + state.best, c + 270, y + 45);
+    ctx.font = "700 10px ui-sans-serif, system-ui";
+    ctx.fillText("BEST " + state.best, c + w * 0.31, y + 34);
   }
 
   function drawEnemyBar(x, y, w) {
     ctx.fillStyle = "rgba(255,255,255,0.12)";
-    round(x, y, w, 10, 7);
+    round(x, y, w, 8, 6);
     ctx.fill();
 
     ctx.fillStyle = state.enemy.color;
-    round(x, y, w * clamp(state.enemy.hp / state.enemy.maxHp, 0, 1), 10, 7);
+    round(x, y, w * clamp(state.enemy.hp / state.enemy.maxHp, 0, 1), 8, 6);
     ctx.fill();
 
     ctx.fillStyle = C.muted;
-    ctx.font = "700 11px ui-sans-serif, system-ui";
+    ctx.font = "700 10px ui-sans-serif, system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("Enemy " + Math.max(0, state.enemy.hp) + "/" + state.enemy.maxHp, x + w / 2, y + 28);
+    ctx.fillText("Enemy " + Math.max(0, state.enemy.hp) + "/" + state.enemy.maxHp, x + w / 2, y + 22);
   }
 
   function drawPhysics(x, y, w) {
-    const cols = W < 760 ? 2 : 4;
+    const cols = W < 760 ? 3 : 6;
     const colW = w / cols;
+    const rowH = W < 760 ? 14 : 13;
 
-    ctx.font = "800 11px ui-sans-serif, system-ui";
+    ctx.font = "800 9px ui-sans-serif, system-ui";
     ctx.textAlign = "left";
 
     physicsValues().forEach(([label, value, color], i) => {
-      const tx = x + 18 + (i % cols) * colW;
-      const ty = y + Math.floor(i / cols) * 17;
+      const tx = x + 12 + (i % cols) * colW;
+      const ty = y + Math.floor(i / cols) * rowH;
 
       ctx.fillStyle = C.muted;
       ctx.fillText(label, tx, ty);
 
       ctx.fillStyle = color || C.text;
-      ctx.fillText(value, tx + 82, ty);
+      ctx.fillText(value, tx + 52, ty);
     });
   }
 
   function drawHearts(x, y) {
     for (let i = 0; i < state.mods.maxHp; i++) {
       ctx.fillStyle = i < state.player.hp ? C.pink : "rgba(255,255,255,0.16)";
-      heart(x + i * 20, y, 7.5);
+      heart(x + i * 16, y, 6);
       ctx.fill();
     }
   }
@@ -1544,7 +1534,7 @@
 
     ctx.fillStyle = C.text;
     ctx.font = `900 ${clamp(W * 0.07, 42, 76)}px ui-sans-serif, system-ui`;
-    ctx.fillText("Spinstate Rally", W / 2, H * 0.28);
+    ctx.fillText("that's a paddlin", W / 2, H * 0.28);
 
     ctx.fillStyle = C.cyan;
     ctx.font = "900 22px ui-sans-serif, system-ui";
@@ -1553,7 +1543,7 @@
     ctx.fillStyle = C.muted;
     ctx.font = "600 18px ui-sans-serif, system-ui";
     wrapText(
-      "Move the paddle with mouse or touch inside the left-side zone. A/D or ←/→ manually rotates the paddle with no 45° cap. Contact speed directly increases ball speed. Center-stall escape prevents deadlocked mid-table states.",
+      "Move the paddle with mouse or touch inside the left-side zone. A/D or ←/→ manually rotates the paddle up to ±160°. Contact speed directly increases ball speed. Center-stall escape prevents deadlocked mid-table states.",
       W / 2,
       H * 0.44,
       Math.min(860, W - 50),
@@ -1667,8 +1657,8 @@
     [
       "Controls",
       "Mouse/touch: move paddle in left-side zone along X and Y",
-      "Paddle movement auto-angles paddle beyond the old 45° limit",
-      "A/D or ←/→: manually rotate with no angle cap",
+      "Paddle movement auto-angles paddle up to ±160°",
+      "A/D or ←/→: manually rotate up to ±160°",
       "L: lock/unlock current angle · X: unlock auto-angle",
       "Shift: faster mouse response · Alt/Ctrl: precision response",
       "Contact speed directly increases ball speed",
@@ -1903,3 +1893,4 @@
 </script>
 </body>
 </html>
+```
