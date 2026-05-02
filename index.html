@@ -114,7 +114,10 @@
       wallSpinTransfer: 0.0045,
       wallExitBias: 34,
       minHorizontalRatio: 0.50,
-      maxVerticalRatio: 1.18
+      maxVerticalRatio: 1.18,
+      contactSpeedGain: 0.38,
+      paddlePushGain: 0.62,
+      maxContactBoost: 340
     },
 
     blocks: {
@@ -443,6 +446,8 @@
         damage: state.mods.damage,
         spin: 0,
         lift: 0,
+        contactSpeed: 0,
+        paddleSpeedAtContact: 0,
         lastHit: "none",
         wallBounceStreak: 0,
         lastWallBounceAt: 0,
@@ -787,44 +792,121 @@
   }
 
   function collidePaddle(b, p, player) {
-    const hit = player ? rotatedRectCircle(p, b) : { hit: rectCircle(paddleRect(p), b), rel: clamp((b.y - p.y) / (p.h / 2), -1, 1) };
-
+    const hit = player
+      ? rotatedRectCircle(p, b)
+      : {
+          hit: rectCircle(paddleRect(p), b),
+          rel: clamp((b.y - p.y) / (p.h / 2), -1, 1)
+        };
+  
     if (!hit.hit) return;
     if (player && b.vx > 0) return;
     if (!player && b.vx < 0) return;
-
+  
     const rel = hit.rel;
-    const sp = Math.max(CFG.ball.minSpeed, speedOf(b) * 1.04);
-
+    const incomingSpeed = Math.max(CFG.ball.minSpeed, speedOf(b));
+  
     if (player) {
+      const normal = {
+        x: Math.cos(p.angle),
+        y: Math.sin(p.angle)
+      };
+  
+      const tangent = {
+        x: -Math.sin(p.angle),
+        y: Math.cos(p.angle)
+      };
+  
+      const ballNormalSpeed = -(b.vx * normal.x + b.vy * normal.y);
+      const paddleNormalSpeed = p.vx * normal.x + p.vy * normal.y;
+      const paddleTangentSpeed = p.vx * tangent.x + p.vy * tangent.y;
+      const paddleMoveSpeed = Math.hypot(p.vx, p.vy);
+  
+      const relativeContactSpeed = Math.max(0, ballNormalSpeed + paddleNormalSpeed);
+      const forwardPush = Math.max(0, paddleNormalSpeed);
+  
+      const contactBoost = clamp(
+        relativeContactSpeed * CFG.ball.contactSpeedGain +
+        forwardPush * CFG.ball.paddlePushGain,
+        0,
+        CFG.ball.maxContactBoost
+      );
+  
+      const outgoingSpeed = clamp(
+        incomingSpeed * 0.97 + contactBoost,
+        CFG.ball.minSpeed,
+        CFG.ball.maxSpeed + state.room * 14
+      );
+  
       const launch = p.angle + rel * 0.52;
-      const spinFromMotion = clamp((p.vy / 660) + (p.vx / 700) * 0.22 + p.angle / CFG.paddle.maxAngle * 0.42 + rel * 0.35, -1.7, 1.7);
-
-      b.spin = clamp(b.spin * 0.28 + spinFromMotion * state.mods.spinPower, -CFG.ball.maxSpin, CFG.ball.maxSpin);
-      b.vx = Math.cos(launch) * sp + p.vx * 0.10;
-      b.vy = Math.sin(launch) * sp + p.vy * 0.15 + rand(-6, 6);
+      const spinFromContact = clamp(
+        paddleTangentSpeed / 650 +
+        paddleNormalSpeed / 1200 +
+        p.angle / CFG.paddle.maxAngle * 0.42 +
+        rel * 0.35,
+        -1.7,
+        1.7
+      );
+  
+      b.spin = clamp(
+        b.spin * 0.28 + spinFromContact * state.mods.spinPower,
+        -CFG.ball.maxSpin,
+        CFG.ball.maxSpin
+      );
+  
+      b.vx = Math.cos(launch) * outgoingSpeed + tangent.x * paddleTangentSpeed * 0.08;
+      b.vy = Math.sin(launch) * outgoingSpeed + tangent.y * paddleTangentSpeed * 0.08 + rand(-5, 5);
+  
+      b.contactSpeed = relativeContactSpeed;
+      b.paddleSpeedAtContact = paddleMoveSpeed;
+  
       b.x = p.x + Math.cos(p.angle) * (p.w / 2 + b.r + 1);
       b.y = p.y + Math.sin(p.angle) * (p.w / 2 + b.r + 1) + rel * p.h * 0.36;
     } else {
       const a = rel * 0.82;
       const tangential = clamp(p.vy / 620 + rel * 0.46, -1.7, 1.7);
-
-      b.spin = clamp(b.spin * 0.28 + tangential * 0.7, -CFG.ball.maxSpin, CFG.ball.maxSpin);
-      b.vx = -Math.cos(a) * sp;
-      b.vy = Math.sin(a) * sp + p.vy * 0.15 + rand(-7, 7);
+      const outgoingSpeed = Math.max(CFG.ball.minSpeed, incomingSpeed * 1.035);
+  
+      b.spin = clamp(
+        b.spin * 0.28 + tangential * 0.7,
+        -CFG.ball.maxSpin,
+        CFG.ball.maxSpin
+      );
+  
+      b.vx = -Math.cos(a) * outgoingSpeed;
+      b.vy = Math.sin(a) * outgoingSpeed + p.vy * 0.15 + rand(-7, 7);
+  
+      b.contactSpeed = incomingSpeed;
+      b.paddleSpeedAtContact = Math.abs(p.vy);
+  
       b.x = p.x - b.r - 1;
     }
-
+  
     b.lastHit = player ? "player" : "enemy";
     b.wallBounceStreak = 0;
-
+  
     stabilize(b);
-    burst(b.x, b.y, player ? C.cyan : p.color, Math.abs(b.spin) > 0.65 ? 22 : 12);
-
+  
+    burst(
+      b.x,
+      b.y,
+      player ? C.cyan : p.color,
+      Math.abs(b.spin) > 0.65 ? 22 : 12
+    );
+  
     if (Math.abs(b.spin) > 0.65) {
-      floatText(b.x, b.y - 18, b.spin > 0 ? "TOPSPIN" : "BACKSPIN", b.spin > 0 ? C.gold : C.purple);
+      floatText(
+        b.x,
+        b.y - 18,
+        b.spin > 0 ? "TOPSPIN" : "BACKSPIN",
+        b.spin > 0 ? C.gold : C.purple
+      );
     }
-  }
+  
+    if (player && b.contactSpeed > 520) {
+      floatText(b.x, b.y + 22, "POWER " + b.contactSpeed.toFixed(0), C.gold);
+    }
+  }                                
 
   function collideBlocks(b) {
     for (let i = state.blocks.length - 1; i >= 0; i--) {
@@ -987,9 +1069,11 @@
     const sp = speedOf(b);
     const spin = b ? b.spin : 0;
     const angle = p ? radToDeg(p.angle) : 0;
-
+  
     return [
       ["Ball", sp.toFixed(0) + " px/s", C.cyan],
+      ["Contact", b ? b.contactSpeed.toFixed(0) + " px/s" : "0 px/s", C.gold],
+      ["Paddle hit V", b ? b.paddleSpeedAtContact.toFixed(0) + " px/s" : "0 px/s", C.text],
       ["VX / VY", b ? b.vx.toFixed(0) + " / " + b.vy.toFixed(0) : "0 / 0", C.text],
       ["Spin", spin.toFixed(2), spin >= 0 ? C.gold : C.purple],
       ["Magnus", b ? b.lift.toFixed(0) + " px/s²" : "0 px/s²", C.text],
