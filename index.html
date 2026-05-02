@@ -1,4 +1,3 @@
-```html id="thats-a-paddlin-full"
 <!doctype html>
 <html lang="en">
 <head>
@@ -108,25 +107,28 @@
       minSpeed: 470,
 
       /*
-        No maximum ball-speed cap.
-        Speed can grow through paddle contact speed and relics.
+        Soft caps only.
+        Ball speed and spin can exceed these, but excess is gently compressed.
       */
-      speedCap: Infinity,
+      speedSoftCap: 1500,
+      speedCompression: 0.985,
 
       maxSpin: 2.7,
-      magnus: 0.92,
-      spinDecay: 0.945,
+      spinSoftCap: 1.85,
+      spinCompression: 0.965,
+      magnus: 0.74,
+      spinDecay: 0.925,
 
-      wallSpinKeep: 0.92,
-      wallFriction: 0.055,
-      wallSpinTransfer: 0.0045,
-      wallExitBias: 34,
+      wallSpinKeep: 0.88,
+      wallFriction: 0.07,
+      wallSpinTransfer: 0.0032,
+      wallExitBias: 24,
 
-      minHorizontalRatio: 0.50,
-      maxVerticalRatio: 1.18,
+      circleGuardAngularRatio: 1.35,
+      circleGuardSpinBleed: 0.82,
 
-      contactSpeedGain: 0.38,
-      paddlePushGain: 0.62,
+      contactSpeedGain: 0.36,
+      paddlePushGain: 0.58,
 
       centerStallSeconds: 2.65,
       centerProgressPixels: 90,
@@ -684,12 +686,75 @@
 
     const nx = -b.vy / sp;
     const ny = b.vx / sp;
-    const lift = b.spin * CFG.ball.magnus * sp;
+
+    /*
+      Magnus-style lift: perpendicular to velocity.
+      Soft-limited so high spin curves without entering circular orbit.
+    */
+    const usableSpin = softLimitSigned(
+      b.spin,
+      CFG.ball.spinSoftCap,
+      CFG.ball.spinCompression
+    );
+
+    const lift = usableSpin * CFG.ball.magnus * sp;
 
     b.vx += nx * lift * dt;
     b.vy += ny * lift * dt;
+
     b.spin *= Math.pow(CFG.ball.spinDecay, dt);
+    b.spin = softLimitSigned(
+      b.spin,
+      CFG.ball.spinSoftCap * 1.35,
+      CFG.ball.spinCompression
+    );
+
     b.lift = Math.abs(lift);
+
+    preventCircleOrbit(b);
+  }
+
+  function softLimit(value, softCap, compression) {
+    if (!Number.isFinite(value)) return softCap;
+    if (value <= softCap) return value;
+
+    const excess = value - softCap;
+    return softCap + excess * compression;
+  }
+
+  function softLimitSigned(value, softCap, compression) {
+    const sign = Math.sign(value || 1);
+    return sign * softLimit(Math.abs(value), softCap, compression);
+  }
+
+  function applySpeedSoftCap(b) {
+    const sp = speedOf(b);
+    if (sp <= CFG.ball.speedSoftCap) return;
+
+    const limited = softLimit(sp, CFG.ball.speedSoftCap, CFG.ball.speedCompression);
+    const scale = limited / sp;
+
+    b.vx *= scale;
+    b.vy *= scale;
+  }
+
+  function preventCircleOrbit(b) {
+    const sp = speedOf(b);
+    if (sp < 1) return;
+
+    const curvature = Math.abs(b.lift) / Math.max(sp, 1);
+    const excessiveCurve = curvature > CFG.ball.circleGuardAngularRatio;
+
+    if (!excessiveCurve) return;
+
+    b.spin *= CFG.ball.circleGuardSpinBleed;
+
+    const dir = b.vx < 0 ? -1 : 1;
+    const minForward = sp * 0.38;
+
+    if (Math.abs(b.vx) < minForward) {
+      b.vx = dir * minForward;
+    }
   }
 
   function stabilize(b, force = false) {
@@ -720,10 +785,11 @@
       escapeBall(b);
     }
 
+    applySpeedSoftCap(b);
+
     /*
-      No trajectory-angle limiting here.
-      The ball can now travel at steep, shallow, vertical, or near-horizontal angles.
-      Anti-stuck behavior is handled separately by wallBounce() and updateCenterStall().
+      No hard trajectory-angle limiting.
+      Only soft speed/spin compression and anti-orbit protection are applied.
     */
   }
 
@@ -1144,7 +1210,7 @@
 
     return [
       ["Ball", sp.toFixed(0) + " px/s", C.cyan],
-      ["Cap", "none", C.gold],
+      ["Soft cap", CFG.ball.speedSoftCap + " px/s", C.gold],
       ["Contact", b ? b.contactSpeed.toFixed(0) + " px/s" : "0 px/s", C.gold],
       ["Paddle hit V", b ? b.paddleSpeedAtContact.toFixed(0) + " px/s" : "0 px/s", C.text],
       ["VX / VY", b ? b.vx.toFixed(0) + " / " + b.vy.toFixed(0) : "0 / 0", C.text],
@@ -1538,12 +1604,12 @@
 
     ctx.fillStyle = C.cyan;
     ctx.font = "900 22px ui-sans-serif, system-ui";
-    ctx.fillText("Uncapped quantum-curved roguelike pong", W / 2, H * 0.28 + 42);
+    ctx.fillText("Soft-capped quantum-curved roguelike pong", W / 2, H * 0.28 + 42);
 
     ctx.fillStyle = C.muted;
     ctx.font = "600 18px ui-sans-serif, system-ui";
     wrapText(
-      "Move the paddle with mouse or touch inside the left-side zone. A/D or ←/→ manually rotates the paddle up to ±160°. Contact speed directly increases ball speed. Center-stall escape prevents deadlocked mid-table states.",
+      "Move the paddle with mouse or touch inside the left-side zone. A/D or ←/→ manually rotates the paddle up to ±160°. Contact speed increases ball speed. Soft speed/spin caps prevent circular-orbit states.",
       W / 2,
       H * 0.44,
       Math.min(860, W - 50),
@@ -1661,7 +1727,7 @@
       "A/D or ←/→: manually rotate up to ±160°",
       "L: lock/unlock current angle · X: unlock auto-angle",
       "Shift: faster mouse response · Alt/Ctrl: precision response",
-      "Contact speed directly increases ball speed",
+      "Contact speed increases ball speed; speed/spin use soft caps",
       "1/2/3: choose relic · P: resume · R: restart"
     ].forEach((line, i) => {
       ctx.fillStyle = i === 0 ? C.cyan : C.muted;
@@ -1893,4 +1959,3 @@
 </script>
 </body>
 </html>
-```
