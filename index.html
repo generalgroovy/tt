@@ -137,14 +137,14 @@
 
     blocks: {
       w: 44,
-      h: 26,
+      h: 44,
       base: 7,
       max: 32,
       respawnBase: 3.8,
       respawnStep: 0.23,
       respawnMin: 0.75,
-      marginX: 150,
-      marginY: 92
+      marginX: 28,
+      marginY: 28
     },
 
     rooms: 12
@@ -353,8 +353,8 @@
 
   function spawnRect() {
     const { w, h, marginX, marginY } = CFG.blocks;
-    const minX = Math.max(marginX, W * 0.24);
-    const maxX = Math.min(W - marginX - w, W * 0.76);
+    const minX = Math.max(marginX, CFG.arena.pad + 8);
+    const maxX = W - Math.max(marginX, CFG.arena.pad + 8) - w;
     const minY = marginY;
     const maxY = H - marginY - h;
     const existing = state.blocks.concat(state.previews);
@@ -1000,7 +1000,7 @@
     } else {
       const a = rel * 0.82;
       const tangential = clamp(p.vy / 620 + rel * 0.46, -1.7, 1.7);
-      const outgoingSpeed = Math.max(CFG.ball.minSpeed, incomingSpeed * 1.035);
+      const outgoingSpeed = Math.max(CFG.ball.minSpeed, incomingSpeed * 1.08);
 
       b.spin = clamp(
         b.spin * 0.28 + tangential * 0.7,
