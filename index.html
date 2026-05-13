@@ -75,6 +75,8 @@
     purple: "#a98cff",
     green: "#80ff9a",
     blue: "#55a7ff",
+    orange: "#ff9f43",
+    red: "#ff3864",
     stone: "#858da9"
   };
 
@@ -84,12 +86,12 @@
     paddle: {
       x: 60,
       w: 12,
-      h: 62,
+      h: 56,
       enemyGap: 38,
-      enemyH: 76,
-      mouseFollow: 14,
-      mouseBoost: 2.1,
-      mousePrecision: 0.42,
+      enemyH: 58,
+      mouseFollow: 30,
+      mouseBoost: 2.6,
+      mousePrecision: 0.55,
       zoneMinX: 28,
       zoneMaxRatio: 0.30,
       zoneMaxCap: 320,
@@ -103,14 +105,14 @@
 
     ball: {
       r: 7,
-      startSpeed: 440,
-      minSpeed: 470,
+      startSpeed: 560,
+      minSpeed: 590,
 
       /*
         Soft caps only.
         Ball speed and spin can exceed these, but excess is gently compressed.
       */
-      speedSoftCap: 1500,
+      speedSoftCap: 1900,
       speedCompression: 0.985,
 
       maxSpin: 2.7,
@@ -127,8 +129,8 @@
       circleGuardAngularRatio: 1.35,
       circleGuardSpinBleed: 0.82,
 
-      contactSpeedGain: 0.36,
-      paddlePushGain: 0.58,
+      contactSpeedGain: 0.42,
+      paddlePushGain: 0.66,
 
       centerStallSeconds: 2.65,
       centerProgressPixels: 90,
@@ -136,18 +138,18 @@
     },
 
     blocks: {
-      w: 40,
-      h: 40,
-      base: 7,
-      max: 32,
-      respawnBase: 3.8,
-      respawnStep: 0.23,
-      respawnMin: 0.75,
-      marginX: 24,
-      marginY: 24
+      w: 32,
+      h: 18,
+      base: 12,
+      max: 72,
+      respawnBase: 2.7,
+      respawnStep: 0.025,
+      respawnMin: 0.45,
+      marginX: 126,
+      marginY: 78
     },
 
-    rooms: 12
+    rooms: 100
   };
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -180,7 +182,7 @@
   const state = {
     mode: "title",
     paused: false,
-    room: 1,
+    room: 0,
     score: 0,
     best: store.get("thats-a-paddlin-best", 0),
     combo: 0,
@@ -217,7 +219,18 @@
     ["rust", "Rust Hex", "⌁", "Enemy paddle is 14% slower.", () => state.mods.enemySlow *= 0.86],
     ["shield", "Glass Aegis", "◇", "+1 shield against a miss.", () => state.mods.shield++],
     ["luck", "Lucky Edge", "⚅", "+12% chance to double damage.", () => state.mods.crit += 0.12]
-  ].map(([id, name, icon, desc, apply]) => ({ id, name, icon, desc, apply }));
+  ];
+
+  relics.push(
+    ["combo", "Golden Rhythm", "*", "Combos last longer and pay 12% more.", () => {
+      state.mods.comboWindow += 0.65;
+      state.mods.scoreScale *= 1.12;
+    }],
+    ["phase", "Phase Chip", "~", "Portal and splitter blocks are safer to exploit.", () => state.mods.phaseSafe = true],
+    ["snare", "Static Snare", "#", "Bonus blocks stun the enemy longer.", () => state.mods.enemyStunBonus += 0.18]
+  );
+
+  const relicDeck = relics.map(([id, name, icon, desc, apply]) => ({ id, name, icon, desc, apply }));
 
   function baseMods() {
     return {
@@ -232,8 +245,28 @@
       maxHp: 5,
       shield: 0,
       enemySlow: 1,
-      crit: 0
+      crit: 0,
+      comboWindow: 2,
+      scoreScale: 1,
+      phaseSafe: false,
+      enemyStunBonus: 0
     };
+  }
+
+  function level() {
+    return clamp(state.room, 0, CFG.rooms);
+  }
+
+  function levelT() {
+    return level() / CFG.rooms;
+  }
+
+  function levelBand() {
+    const l = level();
+    if (l < 10) return "calibration";
+    if (l < 40) return "pressure";
+    if (l < 75) return "overdrive";
+    return "apex";
   }
 
   function resize() {
@@ -248,7 +281,7 @@
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
     if (state.player) state.player.x = clamp(state.player.x, playerZone().minX, playerZone().maxX);
-    if (state.enemy) state.enemy.x = W - CFG.paddle.enemyGap;
+    if (state.enemy) state.enemy.x = clamp(state.enemy.x, enemyZone().minX, enemyZone().maxX);
 
     clampActors();
   }
@@ -270,6 +303,8 @@
     }
 
     if (state.enemy) {
+      const z = enemyZone();
+      state.enemy.x = clamp(state.enemy.x, z.minX, z.maxX);
       state.enemy.y = clamp(state.enemy.y, 24 + state.enemy.h / 2, H - 24 - state.enemy.h / 2);
     }
 
@@ -277,6 +312,16 @@
       b.x = clamp(b.x, 30, W - 30);
       b.y = clamp(b.y, 30, H - 30);
     }
+  }
+
+  function enemyZone() {
+    const width = Math.min(CFG.paddle.zoneMaxCap, W * CFG.paddle.zoneMaxRatio);
+    return {
+      minX: W - width,
+      maxX: W - CFG.paddle.zoneMinX,
+      minY: 24,
+      maxY: H - 24
+    };
   }
 
   function makePaddle(x, y, color, hp, h, speed) {
@@ -303,45 +348,91 @@
   }
 
   function makeEnemy() {
-    const hp = 4 + Math.floor(state.room * 1.35);
+    const t = levelT();
+    const hp = 3 + Math.floor(level() * 0.72 + t * t * 18);
 
     return makePaddle(
       W - CFG.paddle.enemyGap,
       H / 2,
       pick([C.purple, C.pink, C.green, C.gold, C.blue]),
       hp,
-      CFG.paddle.enemyH + state.room * 3,
-      330 + state.room * 10
+      CFG.paddle.enemyH + level() * 0.22,
+      170 + t * 820
     );
   }
 
   function targetBlocks() {
-    return clamp(CFG.blocks.base + state.room * 2, CFG.blocks.base, CFG.blocks.max);
+    return clamp(CFG.blocks.base + Math.floor(level() * 0.72), CFG.blocks.base, CFG.blocks.max);
   }
 
   function respawnDelay() {
-    return clamp(CFG.blocks.respawnBase - state.room * CFG.blocks.respawnStep, CFG.blocks.respawnMin, CFG.blocks.respawnBase);
+    return clamp(CFG.blocks.respawnBase - level() * CFG.blocks.respawnStep, CFG.blocks.respawnMin, CFG.blocks.respawnBase);
   }
 
   function blockType() {
-    let t = "brick";
-    if (state.room >= 3 && Math.random() < 0.24) t = "stone";
-    if (state.room >= 4 && Math.random() < 0.16) t = "spike";
-    if (state.room >= 6 && Math.random() < 0.12) t = "portal";
-    return t;
+    const l = level();
+    const roll = Math.random();
+    const table = [
+      ["brick", 1],
+      ["bonus", l >= 4 ? 0.09 : 0],
+      ["stone", l >= 8 ? 0.18 : 0],
+      ["spike", l >= 12 ? 0.13 : 0],
+      ["splitter", l >= 18 ? 0.11 : 0],
+      ["portal", l >= 26 ? 0.10 : 0],
+      ["moving", l >= 34 ? 0.11 : 0],
+      ["regen", l >= 48 ? 0.09 : 0],
+      ["shielded", l >= 62 ? 0.08 : 0],
+      ["bomb", l >= 74 ? 0.07 : 0],
+      ["boss", l >= 90 ? 0.04 : 0]
+    ];
+    const total = table.reduce((sum, [, weight]) => sum + weight, 0);
+    let cursor = roll * total;
+
+    for (const [type, weight] of table) {
+      cursor -= weight;
+      if (cursor <= 0) return type;
+    }
+
+    return "brick";
   }
 
   function blockHp(t) {
-    return t === "stone" ? 3 : t === "portal" ? 2 : 1;
+    if (t === "boss") return 7;
+    if (t === "shielded") return 4;
+    if (t === "stone" || t === "regen") return 3;
+    if (t === "portal" || t === "moving" || t === "splitter") return 2;
+    return 1;
   }
 
   function blockColor(b) {
-    return b.type === "stone" ? C.stone : b.type === "spike" ? C.pink : b.type === "portal" ? C.purple : C.gold;
+    return b.type === "stone" ? C.stone :
+      b.type === "spike" ? C.pink :
+      b.type === "portal" ? C.purple :
+      b.type === "splitter" ? C.blue :
+      b.type === "moving" ? C.green :
+      b.type === "regen" ? C.orange :
+      b.type === "shielded" ? C.cyan :
+      b.type === "bomb" ? C.red :
+      b.type === "boss" ? C.text :
+      b.type === "bonus" ? C.gold :
+      C.gold;
   }
 
   function makeBlock(x, y, type) {
     const hp = blockHp(type);
-    return { x, y, w: CFG.blocks.w, h: CFG.blocks.h, type, hp, maxHp: hp };
+    return {
+      x,
+      y,
+      baseX: x,
+      baseY: y,
+      w: type === "boss" ? CFG.blocks.w * 1.75 : CFG.blocks.w,
+      h: type === "boss" ? CFG.blocks.h * 1.45 : CFG.blocks.h,
+      type,
+      hp,
+      maxHp: hp,
+      phase: rand(0, Math.PI * 2),
+      regen: 0
+    };
   }
 
   function overlap(a, b, pad = 14) {
@@ -412,13 +503,13 @@
     Object.assign(state, {
       mode: "playing",
       paused: false,
-      room: 1,
+      room: 0,
       score: 0,
       combo: 0,
       comboTimer: 0,
       shake: 0,
       flash: 0,
-      message: "Room 1",
+      message: "Level 0",
       messageTimer: 1.25,
       balls: [],
       blocks: [],
@@ -455,7 +546,7 @@
   function serve(count = 1) {
     for (let i = 0; i < count; i++) {
       const dir = Math.random() < 0.5 ? -1 : 1;
-      const sp = (CFG.ball.startSpeed + state.room * 10) * state.mods.ballSpeed;
+      const sp = (CFG.ball.startSpeed + level() * 5.5) * state.mods.ballSpeed;
       const a = rand(-0.42, 0.42);
 
       state.balls.push({
@@ -482,7 +573,7 @@
 
   function createDraft() {
     const repeat = ["heart", "shield", "luck", "meteor", "comet"];
-    const pool = relics.filter(r => !state.relics.includes(r.id) || repeat.includes(r.id));
+    const pool = relicDeck.filter(r => !state.relics.includes(r.id) || repeat.includes(r.id));
 
     state.draft = [];
 
@@ -492,7 +583,7 @@
     }
 
     state.mode = "upgrade";
-    state.message = "Choose a relic";
+    state.message = "Choose an upgrade";
     state.messageTimer = 1.1;
     syncButton();
   }
@@ -516,7 +607,7 @@
     state.enemy = makeEnemy();
     fillBlocks();
     state.mode = "playing";
-    state.message = "Room " + state.room;
+    state.message = "Level " + state.room + " - " + levelBand().toUpperCase();
     state.messageTimer = 1.25;
     serve(1 + state.mods.extraBalls);
     syncButton();
@@ -538,12 +629,33 @@
     state.enemy.stun = Math.max(0, state.enemy.stun - dt);
 
     updatePreviews(dt);
+    updateBlocks(dt);
     updatePlayer(dt);
     updateEnemy(dt);
     updateBalls(dt);
     updateEffects(dt);
 
     if (!state.balls.length && state.mode === "playing") serve(1);
+  }
+
+  function updateBlocks(dt) {
+    const now = performance.now() / 1000;
+
+    for (const b of state.blocks) {
+      if (b.type === "moving") {
+        b.x = b.baseX + Math.sin(now * (1.4 + levelT() * 1.8) + b.phase) * (18 + levelT() * 30);
+        b.y = b.baseY + Math.cos(now * 1.1 + b.phase) * (8 + levelT() * 18);
+      }
+
+      if (b.type === "regen" && b.hp < b.maxHp) {
+        b.regen += dt;
+        if (b.regen > Math.max(0.9, 2.8 - levelT() * 1.4)) {
+          b.hp++;
+          b.regen = 0;
+          floatText(b.x + b.w / 2, b.y, "REGEN", C.orange);
+        }
+      }
+    }
   }
 
   function paddleFollowMultiplier() {
@@ -612,6 +724,8 @@
 
   function updateEnemy(dt) {
     const e = state.enemy;
+    const z = enemyZone();
+    const t = levelT();
 
     e.oldX = e.x;
     e.oldY = e.y;
@@ -622,14 +736,47 @@
     }
 
     const target = state.balls.filter(b => b.vx > 0).sort((a, b) => b.x - a.x)[0] || state.balls[0];
-    const ty = target ? target.y + Math.sin(performance.now() / 430 + state.room) * 24 : H / 2;
+    let tx = z.maxX - e.w / 2;
+    let ty = H / 2;
 
-    e.y += clamp(ty - e.y, -1, 1) * e.speed * state.mods.enemySlow * dt;
+    if (target) {
+      const travel = target.vx > 0 ? Math.max(0, (e.x - target.x) / Math.max(target.vx, 1)) : 0.18;
+      const prediction = predictBallY(target, travel * (0.08 + t * 0.92));
+      const wobble = Math.sin(performance.now() / (720 - t * 430) + state.room) * (46 * (1 - t));
+      const mistake = rand(-1, 1) * (72 * (1 - t) ** 1.7);
+      const chaseLead = clamp((target.x - W * 0.5) / (W * 0.5), 0, 1);
+
+      ty = prediction + wobble + mistake;
+      tx = z.maxX - e.w / 2 - chaseLead * (z.maxX - z.minX) * (0.18 + t * 0.68);
+    }
+
+    const delay = 0.42 * (1 - t);
+    const agility = e.speed * state.mods.enemySlow * (0.35 + t * 0.95);
+    const step = agility * dt * (1 - delay);
+
+    e.x += clamp(tx - e.x, -step, step);
+    e.y += clamp(ty - e.y, -step, step);
+    e.x = clamp(e.x, z.minX, z.maxX - e.w / 2);
     e.y = clamp(e.y, 24 + e.h / 2, H - 24 - e.h / 2);
 
-    e.vx = 0;
+    e.vx = (e.x - e.oldX) / Math.max(dt, 0.001);
     e.vy = (e.y - e.oldY) / Math.max(dt, 0.001);
     e.angle = 0;
+  }
+
+  function predictBallY(b, seconds) {
+    let y = b.y + b.vy * seconds;
+    const top = CFG.arena.pad + b.r;
+    const bottom = H - CFG.arena.pad - b.r;
+    const span = bottom - top;
+
+    if (span <= 0) return b.y;
+
+    y = (y - top) % (span * 2);
+    if (y < 0) y += span * 2;
+    if (y > span) y = span * 2 - y;
+
+    return top + y;
   }
 
   function updateBalls(dt) {
@@ -1072,28 +1219,138 @@
       b.wallBounceStreak = 0;
       stabilize(b);
 
-      block.hp--;
-      addScore(block.type === "stone" ? 28 : 18, cx, cy);
+      const shielded = block.type === "shielded" && block.hp === block.maxHp;
+      block.hp -= shielded ? 0 : b.damage;
+      if (shielded) {
+        block.type = "stone";
+        block.hp = Math.max(2, block.hp - 1);
+        floatText(cx, cy, "SHIELD BREAK", C.cyan);
+      }
+
+      addScore(block.type === "stone" ? 28 : block.type === "boss" ? 45 : 18, cx, cy);
       burst(cx, cy, blockColor(block), 12);
 
       if (block.type === "portal") {
         b.y = H - b.y;
-        b.vx *= 1.04;
-        b.vy += rand(-90, 90);
+        b.vx *= state.mods.phaseSafe ? 1.12 : 1.04;
+        b.vy += state.mods.phaseSafe ? rand(-45, 45) : rand(-90, 90);
         stabilize(b);
         burst(b.x, b.y, C.purple, 20);
       }
 
-      if (block.type === "spike" && b.lastHit !== "player") hurtPlayer(1);
+      if (block.type === "splitter" && state.balls.length < 5 + Math.floor(levelT() * 4)) {
+        splitBall(b, cx, cy);
+      }
+
+      if (block.type === "bonus") {
+        applyBonusBlock(b, cx, cy);
+      }
+
+      if (block.type === "spike" && b.lastHit !== "player" && !state.mods.phaseSafe) hurtPlayer(1);
 
       if (block.hp <= 0) {
         state.blocks.splice(i, 1);
         scheduleBlock();
-        addScore(block.type === "spike" ? 80 : block.type === "portal" ? 95 : 50, cx, cy, "BROKE");
+        applyBreakEffect(block, b, cx, cy);
+        addScore(blockScore(block), cx, cy, block.type.toUpperCase());
       }
 
       return;
     }
+  }
+
+  function splitBall(source, x, y) {
+    const sp = Math.max(CFG.ball.minSpeed, speedOf(source) * 0.92);
+    const dir = source.vx >= 0 ? 1 : -1;
+
+    state.balls.push({
+      ...source,
+      x,
+      y,
+      vx: dir * Math.cos(0.38) * sp,
+      vy: -Math.sign(source.vy || 1) * Math.sin(0.38) * sp,
+      spin: -source.spin * 0.7,
+      trail: []
+    });
+
+    floatText(x, y - 20, "SPLIT", C.blue);
+  }
+
+  function applyBonusBlock(b, x, y) {
+    const effects = level() < 20
+      ? ["heal", "slow", "score"]
+      : level() < 55
+        ? ["heal", "slow", "score", "speed", "stun", "shield"]
+        : ["heal", "slow", "score", "speed", "stun", "shield", "curve", "multiball"];
+    const effect = pick(effects);
+
+    if (effect === "heal") {
+      state.player.hp = Math.min(state.mods.maxHp, state.player.hp + 1);
+      floatText(x, y, "HEAL", C.green);
+    } else if (effect === "slow") {
+      for (const ball of state.balls) {
+        ball.vx *= 0.88;
+        ball.vy *= 0.88;
+      }
+      floatText(x, y, "SLOW FIELD", C.cyan);
+    } else if (effect === "score") {
+      addScore(250 + level() * 8, x, y, "BONUS");
+    } else if (effect === "speed") {
+      b.vx *= 1.16;
+      b.vy *= 1.16;
+      floatText(x, y, "BOOST", C.gold);
+    } else if (effect === "stun") {
+      state.enemy.stun = Math.max(state.enemy.stun, 0.45 + state.mods.enemyStunBonus);
+      floatText(x, y, "SNARE", C.purple);
+    } else if (effect === "shield") {
+      state.mods.shield++;
+      floatText(x, y, "AEGIS", C.cyan);
+    } else if (effect === "curve") {
+      b.spin = clamp(b.spin + rand(-1.4, 1.4), -CFG.ball.maxSpin, CFG.ball.maxSpin);
+      floatText(x, y, "CURVE", C.orange);
+    } else if (effect === "multiball") {
+      splitBall(b, x, y);
+    }
+  }
+
+  function applyBreakEffect(block, b, x, y) {
+    if (block.type === "bomb") {
+      for (let i = state.blocks.length - 1; i >= 0; i--) {
+        const other = state.blocks[i];
+        const ox = other.x + other.w / 2;
+        const oy = other.y + other.h / 2;
+
+        if (Math.hypot(ox - x, oy - y) < 92) {
+          state.blocks.splice(i, 1);
+          addScore(40, ox, oy, "CHAIN");
+          burst(ox, oy, blockColor(other), 14);
+        }
+      }
+
+      b.vx *= 1.12;
+      b.vy *= 1.12;
+      state.shake = Math.max(state.shake, 12);
+      burst(x, y, C.red, 42);
+    }
+
+    if (block.type === "boss") {
+      state.enemy.stun = Math.max(state.enemy.stun, 0.9 + state.mods.enemyStunBonus);
+      state.mods.shield++;
+      floatText(x, y - 24, "BOSS CORE", C.text);
+    }
+  }
+
+  function blockScore(block) {
+    return block.type === "spike" ? 80 :
+      block.type === "portal" ? 95 :
+      block.type === "splitter" ? 105 :
+      block.type === "moving" ? 120 :
+      block.type === "regen" ? 135 :
+      block.type === "shielded" ? 150 :
+      block.type === "bomb" ? 170 :
+      block.type === "boss" ? 420 :
+      block.type === "bonus" ? 180 :
+      50;
   }
 
   function hurtPlayer(n) {
@@ -1136,17 +1393,18 @@
 
     if (state.enemy.hp <= 0 && state.mode === "playing") {
       state.balls = [];
-      addScore(250 + state.room * 50, W / 2, H / 2, "ROOM CLEAR");
+      addScore(250 + state.room * 50, W / 2, H / 2, "LEVEL CLEAR");
       state.mode = "cleared";
       setTimeout(() => { if (state.mode === "cleared") createDraft(); }, 350);
     }
   }
 
   function addScore(points, x, y, label) {
-    const gain = Math.round(points * (1 + Math.min(1.5, state.combo * 0.05)));
+    const scale = state.mods ? state.mods.scoreScale : 1;
+    const gain = Math.round(points * scale * (1 + Math.min(1.8, state.combo * 0.055)));
     state.score += gain;
     state.combo++;
-    state.comboTimer = 2;
+    state.comboTimer = state.mods ? state.mods.comboWindow : 2;
     floatText(x, y, label || "+" + gain, C.gold);
   }
 
@@ -1223,6 +1481,8 @@
       ["Spin decay", CFG.ball.spinDecay.toFixed(3) + "/s", C.text],
       ["Wall keep", Math.round(CFG.ball.wallSpinKeep * 100) + "%", C.text],
       ["Stall", b ? b.stallTimer.toFixed(1) + "s" : "0s", C.text],
+      ["Enemy AI", Math.round(levelT() * 100) + "%", C.pink],
+      ["Band", levelBand(), C.green],
       ["Respawn", respawnDelay().toFixed(2) + "s", C.text],
       ["Blocks", state.blocks.length + "+" + state.previews.length + "/" + targetBlocks(), C.text],
       ["Shield", String(state.mods ? state.mods.shield : 0), C.text],
@@ -1382,6 +1642,11 @@
 
       if (b.type === "spike") drawSpikes(b);
       if (b.type === "portal") drawPortal(b);
+      if (b.type === "splitter") drawSplitter(b);
+      if (b.type === "bomb") drawBomb(b);
+      if (b.type === "bonus") drawBonus(b);
+      if (b.type === "shielded") drawShielded(b);
+      if (b.type === "boss") drawBoss(b);
 
       ctx.restore();
     }
@@ -1391,10 +1656,11 @@
     ctx.fillStyle = "rgba(0,0,0,0.38)";
 
     for (let i = 0; i < 3; i++) {
+      const x = b.x + b.w * (0.18 + i * 0.28);
       ctx.beginPath();
-      ctx.moveTo(b.x + 9 + i * 12, b.y + b.h - 5);
-      ctx.lineTo(b.x + 15 + i * 12, b.y + 6);
-      ctx.lineTo(b.x + 21 + i * 12, b.y + b.h - 5);
+      ctx.moveTo(x, b.y + b.h - 4);
+      ctx.lineTo(x + b.w * 0.12, b.y + 5);
+      ctx.lineTo(x + b.w * 0.24, b.y + b.h - 4);
       ctx.fill();
     }
   }
@@ -1402,7 +1668,50 @@
   function drawPortal(b) {
     ctx.strokeStyle = "rgba(255,255,255,0.76)";
     ctx.beginPath();
-    ctx.ellipse(b.x + b.w / 2, b.y + b.h / 2, 13, 7, performance.now() / 350, 0, Math.PI * 2);
+    ctx.ellipse(b.x + b.w / 2, b.y + b.h / 2, b.w * 0.30, b.h * 0.28, performance.now() / 350, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  function drawSplitter(b) {
+    ctx.strokeStyle = "rgba(255,255,255,0.72)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(b.x + b.w * 0.28, b.y + b.h * 0.25);
+    ctx.lineTo(b.x + b.w * 0.72, b.y + b.h * 0.5);
+    ctx.lineTo(b.x + b.w * 0.28, b.y + b.h * 0.75);
+    ctx.stroke();
+  }
+
+  function drawBomb(b) {
+    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.beginPath();
+    ctx.arc(b.x + b.w / 2, b.y + b.h / 2, Math.min(b.w, b.h) * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawBonus(b) {
+    ctx.fillStyle = "rgba(0,0,0,0.48)";
+    ctx.font = "900 15px ui-sans-serif, system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("+", b.x + b.w / 2, b.y + b.h / 2 + 5);
+  }
+
+  function drawShielded(b) {
+    ctx.strokeStyle = "rgba(255,255,255,0.76)";
+    ctx.lineWidth = 2;
+    round(b.x + 4, b.y + 4, b.w - 8, b.h - 8, 5);
+    ctx.stroke();
+  }
+
+  function drawBoss(b) {
+    ctx.strokeStyle = C.red;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(b.x + b.w * 0.22, b.y + b.h * 0.5);
+    ctx.lineTo(b.x + b.w * 0.5, b.y + b.h * 0.18);
+    ctx.lineTo(b.x + b.w * 0.78, b.y + b.h * 0.5);
+    ctx.lineTo(b.x + b.w * 0.5, b.y + b.h * 0.82);
+    ctx.closePath();
     ctx.stroke();
   }
 
@@ -1536,7 +1845,7 @@
     ctx.textAlign = "center";
     ctx.fillStyle = C.text;
     ctx.font = "900 13px ui-sans-serif, system-ui";
-    ctx.fillText("Room " + state.room + "/" + CFG.rooms, c - w * 0.38, y + 20);
+    ctx.fillText("Level " + state.room + "/" + CFG.rooms, c - w * 0.38, y + 20);
 
     drawHearts(c - w * 0.27, y + 18);
     drawEnemyBar(c - w * 0.07, y + 12, Math.min(150, w * 0.22));
@@ -1604,12 +1913,12 @@
 
     ctx.fillStyle = C.cyan;
     ctx.font = "900 22px ui-sans-serif, system-ui";
-    ctx.fillText("Soft-capped quantum-curved roguelike pong", W / 2, H * 0.28 + 42);
+    ctx.fillText("100-level quantum-curved roguelike pong", W / 2, H * 0.28 + 42);
 
     ctx.fillStyle = C.muted;
     ctx.font = "600 18px ui-sans-serif, system-ui";
     wrapText(
-      "Move the paddle with mouse or touch inside the left-side zone. A/D or ←/→ manually rotates the paddle up to ±160°. Contact speed increases ball speed. Soft speed/spin caps prevent circular-orbit states.",
+      "Move the paddle with mouse or touch inside the left-side zone. Smaller paddles, faster balls, denser blocks, escalating block effects, and an enemy AI that grows from level 0 training dummy to level 100 apex defender.",
       W / 2,
       H * 0.44,
       Math.min(860, W - 50),
@@ -1627,7 +1936,7 @@
 
     ctx.fillStyle = C.text;
     ctx.font = "900 44px ui-sans-serif, system-ui";
-    ctx.fillText("Choose a Relic", W / 2, 92);
+    ctx.fillText("Choose an Upgrade", W / 2, 92);
 
     ctx.fillStyle = C.muted;
     ctx.font = "700 16px ui-sans-serif, system-ui";
@@ -1728,7 +2037,7 @@
       "L: lock/unlock current angle · X: unlock auto-angle",
       "Shift: faster mouse response · Alt/Ctrl: precision response",
       "Contact speed increases ball speed; speed/spin use soft caps",
-      "1/2/3: choose relic · P: resume · R: restart"
+      "1/2/3: choose upgrade · P: resume · R: restart"
     ].forEach((line, i) => {
       ctx.fillStyle = i === 0 ? C.cyan : C.muted;
       ctx.font = i === 0 ? "900 20px ui-sans-serif, system-ui" : "700 15px ui-sans-serif, system-ui";
@@ -1942,7 +2251,7 @@
   window.addEventListener("orientationchange", resize);
 
   function loop(t) {
-    const dt = Math.min(0.033, (t - state.last) / 1000 || 0);
+    const dt = Math.min(0.016, (t - state.last) / 1000 || 0);
     state.last = t;
 
     update(dt);
