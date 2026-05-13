@@ -187,8 +187,8 @@
     best: store.get("thats-a-paddlin-best", 0),
     combo: 0,
     comboTimer: 0,
+    freeServe: false,
     last: performance.now(),
-    shake: 0,
     flash: 0,
     message: "",
     messageTimer: 0,
@@ -357,7 +357,7 @@
       pick([C.purple, C.pink, C.green, C.gold, C.blue]),
       hp,
       CFG.paddle.enemyH + level() * 0.22,
-      170 + t * 820
+      230 + t * 760
     );
   }
 
@@ -507,10 +507,10 @@
       score: 0,
       combo: 0,
       comboTimer: 0,
-      shake: 0,
+      freeServe: true,
       flash: 0,
-      message: "Level 0",
-      messageTimer: 1.25,
+      message: "Free serve",
+      messageTimer: 2,
       balls: [],
       blocks: [],
       previews: [],
@@ -538,20 +538,37 @@
 
     state.enemy = makeEnemy();
     fillBlocks();
-    serve(1 + state.mods.extraBalls);
+    prepareFreeServe();
     canvas.focus();
     syncButton();
   }
 
-  function serve(count = 1) {
+  function prepareFreeServe() {
+    state.freeServe = true;
+    state.balls = [];
+    state.message = "Level " + state.room + " - Free serve";
+    state.messageTimer = 2;
+  }
+
+  function launchFreeServe() {
+    if (state.mode !== "playing" || !state.freeServe) return false;
+
+    state.freeServe = false;
+    serve(1 + state.mods.extraBalls, 1, true);
+    return true;
+  }
+
+  function serve(count = 1, forcedDir = null, fromPlayer = false) {
     for (let i = 0; i < count; i++) {
-      const dir = Math.random() < 0.5 ? -1 : 1;
+      const dir = forcedDir || (Math.random() < 0.5 ? -1 : 1);
       const sp = (CFG.ball.startSpeed + level() * 5.5) * state.mods.ballSpeed;
       const a = rand(-0.42, 0.42);
+      const sx = fromPlayer && state.player ? state.player.x + 34 + i * 10 : W / 2 + rand(-18, 18);
+      const sy = fromPlayer && state.player ? state.player.y + rand(-18, 18) : H / 2 + rand(-70, 70);
 
       state.balls.push({
-        x: W / 2 + rand(-18, 18),
-        y: H / 2 + rand(-70, 70),
+        x: sx,
+        y: clamp(sy, CFG.arena.pad + CFG.ball.r, H - CFG.arena.pad - CFG.ball.r),
         vx: Math.cos(a) * sp * dir,
         vy: Math.sin(a) * sp,
         r: state.mods.radius,
@@ -607,9 +624,7 @@
     state.enemy = makeEnemy();
     fillBlocks();
     state.mode = "playing";
-    state.message = "Level " + state.room + " - " + levelBand().toUpperCase();
-    state.messageTimer = 1.25;
-    serve(1 + state.mods.extraBalls);
+    prepareFreeServe();
     syncButton();
   }
 
@@ -623,7 +638,6 @@
     state.comboTimer = Math.max(0, state.comboTimer - dt);
     if (state.comboTimer === 0) state.combo = 0;
 
-    state.shake = Math.max(0, state.shake - dt * 20);
     state.flash = Math.max(0, state.flash - dt * 1.7);
     state.player.invuln = Math.max(0, state.player.invuln - dt);
     state.enemy.stun = Math.max(0, state.enemy.stun - dt);
@@ -635,7 +649,7 @@
     updateBalls(dt);
     updateEffects(dt);
 
-    if (!state.balls.length && state.mode === "playing") serve(1);
+    if (!state.balls.length && state.mode === "playing" && !state.freeServe) serve(1);
   }
 
   function updateBlocks(dt) {
@@ -750,8 +764,8 @@
       tx = z.maxX - e.w / 2 - chaseLead * (z.maxX - z.minX) * (0.18 + t * 0.68);
     }
 
-    const delay = 0.42 * (1 - t);
-    const agility = e.speed * state.mods.enemySlow * (0.35 + t * 0.95);
+    const delay = 0.30 * (1 - t);
+    const agility = e.speed * state.mods.enemySlow * (0.44 + t * 0.86);
     const step = agility * dt * (1 - delay);
 
     e.x += clamp(tx - e.x, -step, step);
@@ -1329,7 +1343,6 @@
 
       b.vx *= 1.12;
       b.vy *= 1.12;
-      state.shake = Math.max(state.shake, 12);
       burst(x, y, C.red, 42);
     }
 
@@ -1367,8 +1380,6 @@
     state.player.invuln = 1;
     state.combo = 0;
     state.flash = 0.2;
-    state.shake = 10;
-
     burst(state.player.x, state.player.y, C.pink, 34);
 
     if (state.player.hp <= 0) {
@@ -1386,8 +1397,6 @@
 
     state.enemy.hp -= n;
     state.enemy.stun = Math.max(state.enemy.stun, 0.12);
-    state.shake = Math.max(state.shake, 4 + n * 2);
-
     addScore(70 * n, x, y, "-" + n + " HP");
     burst(x, y, state.enemy.color, 20 + n * 5);
 
@@ -1494,10 +1503,6 @@
     ctx.clearRect(0, 0, W, H);
 
     ctx.save();
-
-    if (state.shake) {
-      ctx.translate(rand(-state.shake, state.shake), rand(-state.shake, state.shake));
-    }
 
     drawBackground();
     drawArena();
@@ -1836,6 +1841,13 @@
       ctx.fillText(state.message, W / 2, H / 2 - 116);
     }
 
+    if (state.freeServe) {
+      ctx.textAlign = "center";
+      ctx.fillStyle = C.cyan;
+      ctx.font = "900 18px ui-sans-serif, system-ui";
+      ctx.fillText("Click or press Space to serve", W / 2, H / 2 - 74);
+    }
+
     ctx.restore();
   }
 
@@ -2018,7 +2030,7 @@
     ctx.fillText("Paused", W / 2, H * 0.18);
 
     const boxW = Math.min(760, W - 38);
-    const boxH = 374;
+    const boxH = 402;
     const x = W / 2 - boxW / 2;
     const y = H * 0.25;
 
@@ -2036,6 +2048,7 @@
       "A/D or ←/→: manually rotate up to ±160°",
       "L: lock/unlock current angle · X: unlock auto-angle",
       "Shift: faster mouse response · Alt/Ctrl: precision response",
+      "Click or Space: launch the free serve at the start of each level",
       "Contact speed increases ball speed; speed/spin use soft caps",
       "1/2/3: choose upgrade · P: resume · R: restart"
     ].forEach((line, i) => {
@@ -2047,7 +2060,7 @@
     ctx.textAlign = "left";
     ctx.fillStyle = C.gold;
     ctx.font = "900 14px ui-sans-serif, system-ui";
-    ctx.fillText("Live physics", x + 28, y + 258);
+    ctx.fillText("Live physics", x + 28, y + 286);
 
     ctx.fillStyle = C.muted;
     ctx.font = "700 12px ui-sans-serif, system-ui";
@@ -2056,7 +2069,7 @@
       ctx.fillText(
         l + ": " + v,
         x + 28 + (i % 2) * (boxW / 2 - 12),
-        y + 282 + Math.floor(i / 2) * 18
+        y + 310 + Math.floor(i / 2) * 18
       );
     });
 
@@ -2137,6 +2150,8 @@
       return;
     }
 
+    if (launchFreeServe()) return;
+
     if (state.mode !== "upgrade") return;
 
     const compact = W < 820;
@@ -2214,6 +2229,7 @@
 
     if (e.code === "Space") {
       if (["title", "gameover", "victory"].includes(state.mode)) newRun();
+      else if (launchFreeServe()) return;
       else if (state.mode === "playing" && !state.balls.length) serve(1);
     }
 
