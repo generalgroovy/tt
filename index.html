@@ -116,18 +116,19 @@
       speedCompression: 0.985,
 
       maxSpin: 2.7,
-      spinSoftCap: 1.85,
-      spinCompression: 0.965,
+      spinSoftCap: 1.55,
+      spinCompression: 0.82,
       magnus: 0.74,
       spinDecay: 0.925,
 
-      wallSpinKeep: 0.88,
-      wallFriction: 0.07,
-      wallSpinTransfer: 0.0032,
-      wallExitBias: 24,
+      wallSpinKeep: 0.72,
+      wallFriction: 0.035,
+      wallSpinTransfer: 0.0014,
+      wallExitBias: 8,
+      spinBacktrackGuardRatio: 0.42,
 
       circleGuardAngularRatio: 1.35,
-      circleGuardSpinBleed: 0.82,
+      circleGuardSpinBleed: 0.70,
 
       contactSpeedGain: 0.42,
       paddlePushGain: 0.66,
@@ -866,13 +867,14 @@
     b.spin *= Math.pow(CFG.ball.spinDecay, dt);
     b.spin = softLimitSigned(
       b.spin,
-      CFG.ball.spinSoftCap * 1.35,
+      CFG.ball.spinSoftCap * 1.18,
       CFG.ball.spinCompression
     );
 
     b.lift = Math.abs(lift);
 
     preventCircleOrbit(b);
+    preventSpinBacktrack(b);
   }
 
   function softLimit(value, softCap, compression) {
@@ -899,6 +901,10 @@
     b.vy *= scale;
   }
 
+  function applySpinNaturalCap(b) {
+    b.spin = softLimitSigned(b.spin, CFG.ball.spinSoftCap, CFG.ball.spinCompression);
+  }
+
   function preventCircleOrbit(b) {
     const sp = speedOf(b);
     if (sp < 1) return;
@@ -915,6 +921,22 @@
 
     if (Math.abs(b.vx) < minForward) {
       b.vx = dir * minForward;
+    }
+  }
+
+  function preventSpinBacktrack(b) {
+    if (b.lastHit !== "player" && b.lastHit !== "enemy") return;
+
+    const sp = speedOf(b);
+    if (sp < 1) return;
+
+    const dir = b.lastHit === "player" ? 1 : -1;
+    const minForward = sp * CFG.ball.spinBacktrackGuardRatio;
+
+    if (b.vx * dir < minForward) {
+      b.vx = dir * minForward;
+      b.vy = clamp(b.vy, -sp * 0.86, sp * 0.86);
+      b.spin *= 0.55;
     }
   }
 
@@ -947,6 +969,8 @@
     }
 
     applySpeedSoftCap(b);
+    applySpinNaturalCap(b);
+    preventSpinBacktrack(b);
 
     /*
       No hard trajectory-angle limiting.
@@ -1044,12 +1068,18 @@
 
     b.vx += -slip * CFG.ball.wallFriction;
     b.spin += slip * CFG.ball.wallSpinTransfer * normal;
-    b.spin = clamp(b.spin * CFG.ball.wallSpinKeep, -CFG.ball.maxSpin, CFG.ball.maxSpin);
+    b.spin = softLimitSigned(
+      b.spin * CFG.ball.wallSpinKeep,
+      CFG.ball.spinSoftCap * 0.82,
+      CFG.ball.spinCompression
+    );
 
     if (Math.abs(b.spin) > 0.06) {
-      b.vx += b.spin * normal * CFG.ball.wallExitBias;
+      b.vx += Math.sign(b.vx || 1) * Math.abs(b.spin) * CFG.ball.wallExitBias;
       b.vy += Math.sign(b.vy || normal) * Math.abs(b.spin) * 12;
     }
+
+    preventSpinBacktrack(b);
   }
 
   function paddleRect(p) {
