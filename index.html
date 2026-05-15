@@ -120,6 +120,11 @@
       spinCompression: 0.82,
       magnus: 0.74,
       spinDecay: 0.925,
+      spinIntentCharge: 2.9,
+      spinIntentDecay: 4.2,
+      spinIntentHit: 0.95,
+      spinBlockThreshold: 1.05,
+      spinWallKickThreshold: 1.1,
 
       wallSpinKeep: 0.72,
       wallFriction: 0.035,
@@ -189,6 +194,7 @@
     combo: 0,
     comboTimer: 0,
     freeServe: false,
+    spinIntent: 0,
     last: performance.now(),
     flash: 0,
     message: "",
@@ -509,6 +515,7 @@
       combo: 0,
       comboTimer: 0,
       freeServe: true,
+      spinIntent: 0,
       flash: 0,
       message: "Free serve",
       messageTimer: 2,
@@ -713,6 +720,8 @@
     const right = keys.has("KeyD") || keys.has("ArrowRight") || keys.has("KeyE");
     const dir = (right ? 1 : 0) - (left ? 1 : 0);
 
+    updateSpinIntent(dir, dt);
+
     if (dir !== 0) {
       const fast = keys.has("ShiftLeft") || keys.has("ShiftRight") ? 1.85 : 1;
       p.angleLocked = true;
@@ -735,6 +744,25 @@
 
     p.angle += (target - p.angle) * clamp(dt * CFG.paddle.angleFollow, 0, 1);
     p.angle = clamp(p.angle, -CFG.paddle.maxAngle, CFG.paddle.maxAngle);
+  }
+
+  function updateSpinIntent(dir, dt) {
+    if (dir) {
+      state.spinIntent = clamp(
+        state.spinIntent + dir * CFG.ball.spinIntentCharge * dt,
+        -1,
+        1
+      );
+      return;
+    }
+
+    const decay = CFG.ball.spinIntentDecay * dt;
+
+    if (Math.abs(state.spinIntent) <= decay) {
+      state.spinIntent = 0;
+    } else {
+      state.spinIntent -= Math.sign(state.spinIntent) * decay;
+    }
   }
 
   function updateEnemy(dt) {
@@ -1059,6 +1087,15 @@
     applyWallSpin(b, top);
     stabilize(b, b.wallBounceStreak >= 3);
     burst(b.x, b.y, C.cyan, b.wallBounceStreak >= 2 ? 18 : 8);
+
+    if (Math.abs(b.spin) >= CFG.ball.spinWallKickThreshold) {
+      floatText(
+        b.x,
+        b.y + (top ? 22 : -16),
+        "KICK",
+        b.spin > 0 ? C.gold : C.purple
+      );
+    }
   }
 
   function applyWallSpin(b, top) {
@@ -1165,13 +1202,15 @@
 
       const launch = p.angle + rel * 0.52;
 
+      const chargedSpin = state.spinIntent;
       const spinFromContact = clamp(
         paddleTangentSpeed / 650 +
         paddleNormalSpeed / 1200 +
         p.angle * 0.18 +
-        rel * 0.35,
-        -1.9,
-        1.9
+        rel * 0.35 +
+        chargedSpin * CFG.ball.spinIntentHit,
+        -2.2,
+        2.2
       );
 
       b.spin = clamp(
@@ -1188,6 +1227,13 @@
 
       b.x = p.x + Math.cos(p.angle) * (p.w / 2 + b.r + 1);
       b.y = p.y + Math.sin(p.angle) * (p.w / 2 + b.r + 1) + rel * p.h * 0.36;
+
+      if (Math.abs(chargedSpin) > 0.35) {
+        b.vy += chargedSpin * 70;
+        floatText(b.x, b.y - 34, "SPIN LOAD", chargedSpin > 0 ? C.gold : C.purple);
+      }
+
+      state.spinIntent *= 0.34;
     } else {
       const a = rel * 0.82;
       const tangential = clamp(p.vy / 620 + rel * 0.46, -1.7, 1.7);
@@ -1264,15 +1310,24 @@
       stabilize(b);
 
       const shielded = block.type === "shielded" && block.hp === block.maxHp;
-      block.hp -= shielded ? 0 : b.damage;
+      const spinBreak = Math.abs(b.spin) >= CFG.ball.spinBlockThreshold;
+      const hitDamage = b.damage + (spinBreak && !shielded ? 1 : 0);
+
+      block.hp -= shielded ? 0 : hitDamage;
       if (shielded) {
         block.type = "stone";
         block.hp = Math.max(2, block.hp - 1);
         floatText(cx, cy, "SHIELD BREAK", C.cyan);
       }
 
-      addScore(block.type === "stone" ? 28 : block.type === "boss" ? 45 : 18, cx, cy);
-      burst(cx, cy, blockColor(block), 12);
+      const blockScore = block.type === "stone" ? 28 : block.type === "boss" ? 45 : 18;
+      addScore(blockScore * hitDamage, cx, cy);
+      burst(cx, cy, blockColor(block), spinBreak && !shielded ? 22 : 12);
+
+      if (spinBreak && !shielded) {
+        b.spin *= 0.82;
+        floatText(cx, cy - 20, "SPIN HIT", b.spin > 0 ? C.gold : C.purple);
+      }
 
       if (block.type === "portal") {
         b.y = H - b.y;
@@ -1504,6 +1559,7 @@
     const sp = speedOf(b);
     const spin = b ? b.spin : 0;
     const angle = p ? radToDeg(p.angle) : 0;
+    const intent = state.spinIntent || 0;
 
     return [
       ["Ball", sp.toFixed(0) + " px/s", C.cyan],
@@ -1512,6 +1568,7 @@
       ["Paddle hit V", b ? b.paddleSpeedAtContact.toFixed(0) + " px/s" : "0 px/s", C.text],
       ["VX / VY", b ? b.vx.toFixed(0) + " / " + b.vy.toFixed(0) : "0 / 0", C.text],
       ["Spin", spin.toFixed(2), spin >= 0 ? C.gold : C.purple],
+      ["Spin load", Math.round(Math.abs(intent) * 100) + "%", intent >= 0 ? C.gold : C.purple],
       ["Magnus", b ? b.lift.toFixed(0) + " px/s²" : "0 px/s²", C.text],
       ["Angle", angle.toFixed(0) + "°" + (p && p.angleLocked ? " locked" : ""), C.cyan],
       ["Paddle XY", p ? p.x.toFixed(0) + " / " + p.y.toFixed(0) : "0 / 0", C.text],
@@ -1776,6 +1833,20 @@
       ctx.stroke();
     }
 
+    if (angled && p === state.player && Math.abs(state.spinIntent) > 0.04) {
+      const sign = Math.sign(state.spinIntent);
+      const load = Math.abs(state.spinIntent);
+
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 0.32 + load * 0.5;
+      ctx.strokeStyle = sign > 0 ? C.gold : C.purple;
+      ctx.lineWidth = 2 + load * 2;
+      ctx.beginPath();
+      ctx.moveTo(-p.w / 2 - 8, -p.h / 2 + 4);
+      ctx.quadraticCurveTo(-p.w / 2 - 10 - load * 18 * sign, 0, -p.w / 2 - 8, p.h / 2 - 4);
+      ctx.stroke();
+    }
+
     ctx.restore();
   }
 
@@ -1960,7 +2031,7 @@
     ctx.fillStyle = C.muted;
     ctx.font = "600 18px ui-sans-serif, system-ui";
     wrapText(
-      "Move the paddle with mouse or touch inside the left-side zone. Smaller paddles, faster balls, denser blocks, escalating block effects, and an enemy AI that grows from level 0 training dummy to level 100 apex defender.",
+      "Move the paddle with mouse or touch inside the left-side zone. Hold A/D or ←/→ to rotate and load spin for the next hit. Smaller paddles, faster balls, denser blocks, escalating block effects, and an enemy AI that grows from level 0 training dummy to level 100 apex defender.",
       W / 2,
       H * 0.44,
       Math.min(860, W - 50),
@@ -2075,7 +2146,7 @@
       "Controls",
       "Mouse/touch: move paddle in left-side zone along X and Y",
       "Paddle movement auto-angles paddle up to ±160°",
-      "A/D or ←/→: manually rotate up to ±160°",
+      "A/D or ←/→: rotate and load spin for the next hit",
       "L: lock/unlock current angle · X: unlock auto-angle",
       "Shift: faster mouse response · Alt/Ctrl: precision response",
       "Click or Space: launch the free serve at the start of each level",
