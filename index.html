@@ -1320,8 +1320,8 @@
         floatText(cx, cy, "SHIELD BREAK", C.cyan);
       }
 
-      const blockScore = block.type === "stone" ? 28 : block.type === "boss" ? 45 : 18;
-      addScore(blockScore * hitDamage, cx, cy);
+      const hitScore = block.type === "stone" ? 28 : block.type === "boss" ? 45 : 18;
+      addScore(hitScore * hitDamage, cx, cy);
       burst(cx, cy, blockColor(block), spinBreak && !shielded ? 22 : 12);
 
       if (spinBreak && !shielded) {
