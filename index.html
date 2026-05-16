@@ -77,6 +77,10 @@
     blue: "#55a7ff",
     orange: "#ff9f43",
     red: "#ff3864",
+    brick: "#f6c945",
+    bonus: "#fff06a",
+    shield: "#52e5ff",
+    boss: "#f5f7ff",
     stone: "#858da9"
   };
 
@@ -144,6 +148,7 @@
       paddlePushGain: 0.66,
 
       centerStallSeconds: 2.65,
+      centerEscapeWarningSeconds: 1.45,
       centerProgressPixels: 90,
       centerEscapeHorizontalRatio: 0.72
     },
@@ -372,7 +377,7 @@
       pick([C.purple, C.pink, C.green, C.gold, C.blue]),
       hp,
       CFG.paddle.enemyH + level() * 0.22,
-      280 + t * 860
+      310 + t * 910
     );
   }
 
@@ -426,11 +431,11 @@
       b.type === "splitter" ? C.blue :
       b.type === "moving" ? C.green :
       b.type === "regen" ? C.orange :
-      b.type === "shielded" ? C.cyan :
+      b.type === "shielded" ? C.shield :
       b.type === "bomb" ? C.red :
-      b.type === "boss" ? C.text :
-      b.type === "bonus" ? C.gold :
-      C.gold;
+      b.type === "boss" ? C.boss :
+      b.type === "bonus" ? C.bonus :
+      C.brick;
   }
 
   function makeBlock(x, y, type) {
@@ -582,15 +587,18 @@
       const a = rand(-0.42, 0.42);
       const sx = fromPlayer && state.player ? state.player.x + 34 + i * 10 : W / 2 + rand(-18, 18);
       const sy = fromPlayer && state.player ? state.player.y + rand(-18, 18) : H / 2 + rand(-70, 70);
+      const serveSpin = clamp(rand(-0.62, 0.62) + (fromPlayer ? state.spinIntent * 0.45 : 0), -1.1, 1.1);
 
       state.balls.push({
         x: sx,
         y: clamp(sy, CFG.arena.pad + CFG.ball.r, H - CFG.arena.pad - CFG.ball.r),
+        prevX: sx,
+        prevY: clamp(sy, CFG.arena.pad + CFG.ball.r, H - CFG.arena.pad - CFG.ball.r),
         vx: Math.cos(a) * sp * dir,
         vy: Math.sin(a) * sp,
         r: state.mods.radius,
         damage: state.mods.damage,
-        spin: 0,
+        spin: serveSpin,
         lift: 0,
         contactSpeed: 0,
         paddleSpeedAtContact: 0,
@@ -598,6 +606,7 @@
         wallBounceStreak: 0,
         lastWallBounceAt: 0,
         stallTimer: 0,
+        escapeWarned: false,
         stallAnchorX: W / 2,
         stallAnchorY: H / 2,
         trail: []
@@ -871,6 +880,8 @@
       applySpin(b, dt);
       stabilize(b);
 
+      b.prevX = b.x;
+      b.prevY = b.y;
       b.x += b.vx * dt;
       b.y += b.vy * dt;
 
@@ -1014,7 +1025,8 @@
         spin: 0,
         lift: 0,
         wallBounceStreak: 0,
-        stallTimer: 0
+        stallTimer: 0,
+        escapeWarned: false
       });
 
       return;
@@ -1057,6 +1069,7 @@
     b.spin *= 0.72;
     b.wallBounceStreak = 0;
     b.stallTimer = 0;
+    b.escapeWarned = false;
     b.stallAnchorX = b.x;
     b.stallAnchorY = b.y;
 
@@ -1069,12 +1082,19 @@
 
     if (!inCenter || moved > CFG.ball.centerProgressPixels) {
       b.stallTimer = 0;
+      b.escapeWarned = false;
       b.stallAnchorX = b.x;
       b.stallAnchorY = b.y;
       return;
     }
 
     b.stallTimer += dt;
+
+    if (!b.escapeWarned && b.stallTimer > CFG.ball.centerEscapeWarningSeconds) {
+      b.escapeWarned = true;
+      floatText(b.x, b.y - 24, "ESCAPE SOON", C.cyan);
+      burst(b.x, b.y, C.cyan, 10);
+    }
 
     if (b.stallTimer > CFG.ball.centerStallSeconds) {
       const sp = Math.max(speedOf(b), CFG.ball.minSpeed * 1.12);
@@ -1094,6 +1114,7 @@
 
       b.spin *= 0.85;
       b.stallTimer = 0;
+      b.escapeWarned = false;
       b.stallAnchorX = b.x;
       b.stallAnchorY = b.y;
 
@@ -1156,7 +1177,7 @@
   }
 
   function paddleRect(p) {
-    return { x: p.x, y: p.y - p.h / 2, w: p.w, h: p.h };
+    return { x: p.x - p.w / 2, y: p.y - p.h / 2, w: p.w, h: p.h };
   }
 
   function rectCircle(r, b) {
@@ -1189,13 +1210,73 @@
     };
   }
 
+  function sweptRotatedPaddleHit(p, b) {
+    if (b.prevX === undefined || b.prevY === undefined) return null;
+
+    const prev = paddleLocalPoint(p, b.prevX, b.prevY);
+    const curr = paddleLocalPoint(p, b.x, b.y);
+    const hw = p.w / 2;
+    const hh = p.h / 2;
+    const face = hw + b.r;
+
+    if (prev.x <= face || curr.x > face) return null;
+
+    const dx = curr.x - prev.x;
+    if (Math.abs(dx) < 0.001) return null;
+
+    const t = clamp((face - prev.x) / dx, 0, 1);
+    const y = prev.y + (curr.y - prev.y) * t;
+    if (Math.abs(y) > hh + b.r) return null;
+
+    return {
+      hit: true,
+      lx: face,
+      ly: y,
+      rel: clamp(y / hh, -1, 1)
+    };
+  }
+
+  function paddleLocalPoint(p, x, y) {
+    const dx = x - p.x;
+    const dy = y - p.y;
+    const ca = Math.cos(-p.angle);
+    const sa = Math.sin(-p.angle);
+
+    return {
+      x: dx * ca - dy * sa,
+      y: dx * sa + dy * ca
+    };
+  }
+
+  function sweptRectPaddleHit(r, b) {
+    if (b.prevX === undefined || b.prevY === undefined) return null;
+    if (b.prevX >= r.x - b.r || b.x < r.x - b.r) return null;
+
+    const dx = b.x - b.prevX;
+    if (Math.abs(dx) < 0.001) return null;
+
+    const t = clamp((r.x - b.r - b.prevX) / dx, 0, 1);
+    const y = b.prevY + (b.y - b.prevY) * t;
+    if (y < r.y - b.r || y > r.y + r.h + b.r) return null;
+
+    return {
+      hit: true,
+      rel: clamp((y - (r.y + r.h / 2)) / (r.h / 2), -1, 1)
+    };
+  }
+
   function collidePaddle(b, p, player) {
     const hit = player
-      ? rotatedRectCircle(p, b)
-      : {
-          hit: rectCircle(paddleRect(p), b),
-          rel: clamp((b.y - p.y) / (p.h / 2), -1, 1)
-        };
+      ? (() => {
+          const direct = rotatedRectCircle(p, b);
+          return direct.hit ? direct : sweptRotatedPaddleHit(p, b) || { hit: false };
+        })()
+      : (() => {
+          const r = paddleRect(p);
+          return rectCircle(r, b)
+            ? { hit: true, rel: clamp((b.y - p.y) / (p.h / 2), -1, 1) }
+            : sweptRectPaddleHit(r, b) || { hit: false };
+        })();
 
     if (!hit.hit) return;
     if (player && b.vx > 0) return;
@@ -1287,7 +1368,7 @@
       b.contactSpeed = incomingSpeed;
       b.paddleSpeedAtContact = Math.abs(p.vy);
 
-      b.x = p.x - b.r - 1;
+      b.x = p.x - p.w / 2 - b.r - 1;
     }
 
     b.lastHit = player ? "player" : "enemy";
