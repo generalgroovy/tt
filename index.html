@@ -100,7 +100,12 @@
       angleFromMoveX: 0.36,
       angleFromMoveY: 0.95,
       angleInputSpeed: 1.55,
-      maxAngle: Math.PI * 160 / 180
+      maxAngle: Math.PI * 160 / 180,
+
+      staminaDrain: 0.42,
+      enemyStaminaDrain: 0.34,
+      staminaRefill: 1.85,
+      staminaExhaustPause: 0.5
     },
 
     ball: {
@@ -144,7 +149,7 @@
     },
 
     blocks: {
-      w: 32,
+      w: 18,
       h: 18,
       base: 12,
       max: 72,
@@ -199,6 +204,7 @@
     flash: 0,
     message: "",
     messageTimer: 0,
+    runtimeError: "",
     player: null,
     enemy: null,
     mods: null,
@@ -348,6 +354,8 @@
       color,
       invuln: 0,
       stun: 0,
+      stamina: 1,
+      staminaPause: 0,
       angle: 0,
       manualAngle: 0,
       angleLocked: false
@@ -364,7 +372,7 @@
       pick([C.purple, C.pink, C.green, C.gold, C.blue]),
       hp,
       CFG.paddle.enemyH + level() * 0.22,
-      230 + t * 760
+      280 + t * 860
     );
   }
 
@@ -433,7 +441,7 @@
       baseX: x,
       baseY: y,
       w: type === "boss" ? CFG.blocks.w * 1.75 : CFG.blocks.w,
-      h: type === "boss" ? CFG.blocks.h * 1.45 : CFG.blocks.h,
+      h: type === "boss" ? CFG.blocks.w * 1.75 : CFG.blocks.h,
       type,
       hp,
       maxHp: hp,
@@ -519,6 +527,7 @@
       flash: 0,
       message: "Free serve",
       messageTimer: 2,
+      runtimeError: "",
       balls: [],
       blocks: [],
       previews: [],
@@ -691,6 +700,28 @@
     return m;
   }
 
+  function updatePaddleStamina(p, moving, dt, drainRate = CFG.paddle.staminaDrain) {
+    p.staminaPause = Math.max(0, p.staminaPause - dt);
+
+    if (p.staminaPause > 0) {
+      p.stamina = clamp(p.stamina + CFG.paddle.staminaRefill * dt, 0, 1);
+      return 0;
+    }
+
+    if (moving && p.stamina > 0) {
+      p.stamina = Math.max(0, p.stamina - drainRate * dt);
+
+      if (p.stamina === 0) {
+        p.staminaPause = CFG.paddle.staminaExhaustPause;
+      }
+
+      return 1;
+    }
+
+    p.stamina = clamp(p.stamina + CFG.paddle.staminaRefill * dt, 0, 1);
+    return moving ? 0 : 1;
+  }
+
   function updatePlayer(dt) {
     const p = state.player;
     const z = playerZone();
@@ -699,9 +730,11 @@
     p.oldX = p.x;
     p.oldY = p.y;
 
-    const follow = p.speed * paddleFollowMultiplier();
+    const wantsMove = pointer.active && Math.hypot(pointer.x - p.x, pointer.y - p.y) > 1.5;
+    const staminaScale = updatePaddleStamina(p, wantsMove, dt);
+    const follow = p.speed * paddleFollowMultiplier() * staminaScale;
 
-    if (pointer.active) {
+    if (pointer.active && follow > 0) {
       p.x += (pointer.x - p.x) * clamp(dt * follow, 0, 1);
       p.y += (pointer.y - p.y) * clamp(dt * follow, 0, 1);
     }
@@ -775,6 +808,7 @@
 
     if (e.stun > 0) {
       e.vy = 0;
+      updatePaddleStamina(e, false, dt, CFG.paddle.enemyStaminaDrain);
       return;
     }
 
@@ -794,7 +828,9 @@
     }
 
     const delay = 0.30 * (1 - t);
-    const agility = e.speed * state.mods.enemySlow * (0.44 + t * 0.86);
+    const wantsMove = Math.hypot(tx - e.x, ty - e.y) > 1.5;
+    const staminaScale = updatePaddleStamina(e, wantsMove, dt, CFG.paddle.enemyStaminaDrain);
+    const agility = e.speed * state.mods.enemySlow * (0.44 + t * 0.86) * staminaScale;
     const step = agility * dt * (1 - delay);
 
     e.x += clamp(tx - e.x, -step, step);
@@ -1573,6 +1609,7 @@
       ["Angle", angle.toFixed(0) + "°" + (p && p.angleLocked ? " locked" : ""), C.cyan],
       ["Paddle XY", p ? p.x.toFixed(0) + " / " + p.y.toFixed(0) : "0 / 0", C.text],
       ["Paddle V", p ? p.vx.toFixed(0) + " / " + p.vy.toFixed(0) : "0 / 0", C.text],
+      ["Stamina", p ? Math.round(p.stamina * 100) + "%" : "0%", p && p.staminaPause > 0 ? C.pink : C.green],
       ["Mouse response", paddleFollowMultiplier().toFixed(2) + "×", C.text],
       ["Spin decay", CFG.ball.spinDecay.toFixed(3) + "/s", C.text],
       ["Wall keep", Math.round(CFG.ball.wallSpinKeep * 100) + "%", C.text],
@@ -1600,6 +1637,8 @@
     if (state.player && state.enemy) {
       drawPaddle(state.player, state.player.invuln > 0 ? 0.55 : 1, true);
       drawPaddle(state.enemy, state.enemy.stun > 0 ? 0.55 : 1, false);
+      drawStaminaMeter(state.player, true);
+      drawStaminaMeter(state.enemy, false);
     }
 
     drawBalls();
@@ -1805,6 +1844,32 @@
     ctx.lineTo(b.x + b.w * 0.5, b.y + b.h * 0.82);
     ctx.closePath();
     ctx.stroke();
+  }
+
+  function drawStaminaMeter(p, player) {
+    const w = 46;
+    const h = 5;
+    const x = player ? p.x - w / 2 : p.x - w / 2;
+    const y = p.y + p.h / 2 + 12;
+    const exhausted = p.staminaPause > 0;
+
+    ctx.save();
+    ctx.globalAlpha = 0.88;
+    ctx.fillStyle = "rgba(0,0,0,0.44)";
+    round(x, y, w, h, 3);
+    ctx.fill();
+
+    ctx.fillStyle = exhausted ? C.pink : player ? C.cyan : p.color;
+    round(x, y, w * clamp(p.stamina, 0, 1), h, 3);
+    ctx.fill();
+
+    if (exhausted) {
+      ctx.strokeStyle = C.pink;
+      ctx.globalAlpha = 0.7;
+      ctx.stroke();
+    }
+
+    ctx.restore();
   }
 
   function drawPaddle(p, alpha = 1, angled = true) {
@@ -2116,6 +2181,12 @@
     ctx.font = "900 26px ui-sans-serif, system-ui";
     ctx.fillText("Score " + state.score + " · Best " + state.best, W / 2, H * 0.32 + 50);
 
+    if (state.runtimeError) {
+      ctx.fillStyle = C.muted;
+      ctx.font = "700 15px ui-sans-serif, system-ui";
+      ctx.fillText("Recovered from a runtime error", W / 2, H * 0.32 + 80);
+    }
+
     drawButton(W / 2 - 120, H * 0.54, 240, 54, "Restart", victory ? C.gold : C.pink);
 
     ctx.restore();
@@ -2131,7 +2202,7 @@
     ctx.fillText("Paused", W / 2, H * 0.18);
 
     const boxW = Math.min(760, W - 38);
-    const boxH = 402;
+    const boxH = 428;
     const x = W / 2 - boxW / 2;
     const y = H * 0.25;
 
@@ -2149,6 +2220,7 @@
       "A/D or ←/→: rotate and load spin for the next hit",
       "L: lock/unlock current angle · X: unlock auto-angle",
       "Shift: faster mouse response · Alt/Ctrl: precision response",
+      "Paddles use stamina for full speed; empty stamina pauses movement briefly",
       "Click or Space: launch the free serve at the start of each level",
       "Contact speed increases ball speed; speed/spin use soft caps",
       "1/2/3: choose upgrade · P: resume · R: restart"
@@ -2161,7 +2233,7 @@
     ctx.textAlign = "left";
     ctx.fillStyle = C.gold;
     ctx.font = "900 14px ui-sans-serif, system-ui";
-    ctx.fillText("Live physics", x + 28, y + 286);
+    ctx.fillText("Live physics", x + 28, y + 312);
 
     ctx.fillStyle = C.muted;
     ctx.font = "700 12px ui-sans-serif, system-ui";
@@ -2170,7 +2242,7 @@
       ctx.fillText(
         l + ": " + v,
         x + 28 + (i % 2) * (boxW / 2 - 12),
-        y + 310 + Math.floor(i / 2) * 18
+        y + 336 + Math.floor(i / 2) * 18
       );
     });
 
@@ -2371,10 +2443,30 @@
     const dt = Math.min(0.016, (t - state.last) / 1000 || 0);
     state.last = t;
 
-    update(dt);
-    draw();
+    try {
+      update(dt);
+      draw();
+    } catch (err) {
+      recoverRuntimeError(err);
+      draw();
+    }
 
     requestAnimationFrame(loop);
+  }
+
+  function recoverRuntimeError(err) {
+    console.error(err);
+
+    state.mode = "gameover";
+    state.paused = false;
+    state.freeServe = false;
+    state.runtimeError = err && err.message ? err.message : "Unknown error";
+    state.balls = [];
+    state.previews = [];
+    state.message = "Run recovered";
+    state.messageTimer = 1.5;
+    saveBest();
+    syncButton();
   }
 
   resize();
