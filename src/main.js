@@ -1,3 +1,4 @@
+import './pro-overhaul.js';
 import { Game } from './game.js';
 import { Renderer } from './render.js';
 
@@ -25,7 +26,11 @@ function updatePointer(event, force = false) {
   }
   return p;
 }
+function titleCheckboxHit(x, y) {
+  return game.mode === 'title' && x >= game.W / 2 - 130 && x <= game.W / 2 + 130 && y >= game.H * 0.62 + 68 && y <= game.H * 0.62 + 102;
+}
 function clickAt(x, y) {
+  if (titleCheckboxHit(x, y)) { game.toggleSkipIntro(); renderer.draw(); return; }
   if (['title', 'gameover', 'victory'].includes(game.mode)) { game.newRun(); return; }
   if (game.launchFreeServe()) return;
   if (game.mode !== 'upgrade') return;
@@ -42,7 +47,7 @@ function clickAt(x, y) {
   }
 }
 function loop(now) {
-  const dt = Math.min(0.016, (now - last) / 1000 || 0);
+  const dt = Math.min(0.024, (now - last) / 1000 || 0);
   last = now;
   try { game.update(dt); renderer.draw(); }
   catch (err) {
