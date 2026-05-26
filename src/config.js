@@ -9,16 +9,20 @@ export const CFG = {
   pad: 14,
   paddle: {
     w: 12, h: 56, enemyH: 62, staminaDrain: 0.52, enemyDrain: 0.42,
-    staminaRefill: 1.75, staminaPause: 0.46, maxAngle: Math.PI * 160 / 180
+    staminaRefill: 1.75, staminaPause: 0.46, maxAngle: Math.PI * 160 / 180,
+    angleFollow: 12
   },
   ball: {
     r: 7, startSpeed: 590, minSpeed: 610, speedSoftCap: 1950, speedCompression: 0.986,
     spinSoftCap: 1.55, spinCompression: 0.82, maxSpin: 2.7, magnus: 0.72,
     spinDecay: 0.925, contactGain: 0.42, paddlePush: 0.66,
-    trailMin: 16, trailMax: 58, trailLifeMax: 0.72, trailWidthBoost: 2.2
+    trailMin: 16, trailMax: 58, trailLifeMax: 0.72, trailWidthBoost: 2.2,
+    maxSubsteps: 9
   },
   blocks: { w: 18, h: 18, base: 11, max: 58, respawnBase: 2.7, respawnMin: 0.42 }
 };
+
+Object.prototype.clock = 0;
 
 export const Relics = [
   ['wide', 'Giant Bat', 'B', '+22% paddle height.', m => { m.paddleScale += 0.22; }],
