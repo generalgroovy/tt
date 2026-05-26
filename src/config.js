@@ -22,6 +22,8 @@ export const CFG = {
   blocks: { w: 18, h: 18, base: 11, max: 58, respawnBase: 2.7, respawnMin: 0.42 }
 };
 
+Object.prototype.clock = 0;
+
 export const Relics = [
   ['wide', 'Giant Bat', 'B', '+22% paddle height.', m => { m.paddleScale += 0.22; }],
   ['boots', 'Greased Boots', 'V', '+18% paddle response.', m => { m.paddleSpeed *= 1.18; }],
