@@ -5,6 +5,7 @@ import { clamp, speedOf } from './utils.js';
 
 CFG.ball.serveHoldX = 38;
 CFG.spin = { visibleThreshold: 0.08, intentionalGain: 1.18, releaseDecay: 0.58 };
+CFG.enemyStaminaCarry = { recoveryPerRound: 0.18, minimumAfterRound: 0.16 };
 
 const oldPrepareFreeServe = Game.prototype.prepareFreeServe;
 Game.prototype.prepareFreeServe = function patchedPrepareFreeServe() {
@@ -46,6 +47,10 @@ Game.prototype.update = function patchedUpdate(dt) {
     this.freeServeBall.pulse = (this.freeServeBall.pulse || 0) + dt;
   }
   oldUpdate.call(this, dt);
+  if (this.enemy && Number.isFinite(this.enemy.stamina)) {
+    this.enemyStaminaCarry = this.enemy.stamina;
+    this.enemyWaitCarry = Number.isFinite(this.enemy.wait) ? this.enemy.wait : 0;
+  }
 };
 
 const oldPaddleHit = Game.prototype.paddleHit;
@@ -59,6 +64,40 @@ Game.prototype.paddleHit = function patchedPaddleHit(ball, paddle, side) {
   if (Math.abs(ball.spin - before) > .18) {
     this.notify(ball.spin > 0 ? 'TOPSPIN' : 'BACKSPIN', ball.spin > 0 ? Colors.gold : Colors.purple, .55);
   }
+};
+
+const oldMakeEnemy = Game.prototype.makeEnemy;
+Game.prototype.makeEnemy = function patchedMakeEnemy() {
+  const carry = Number.isFinite(this.enemyStaminaCarry)
+    ? this.enemyStaminaCarry
+    : this.enemy && Number.isFinite(this.enemy.stamina)
+      ? this.enemy.stamina
+      : null;
+  const carryWait = Number.isFinite(this.enemyWaitCarry)
+    ? this.enemyWaitCarry
+    : this.enemy && Number.isFinite(this.enemy.wait)
+      ? this.enemy.wait
+      : 0;
+  const enemy = oldMakeEnemy.call(this);
+  if (carry !== null && this.level > -5) {
+    enemy.stamina = clamp(
+      Math.max(CFG.enemyStaminaCarry.minimumAfterRound, carry) + CFG.enemyStaminaCarry.recoveryPerRound,
+      CFG.enemyStaminaCarry.minimumAfterRound,
+      1
+    );
+    enemy.wait = clamp(carryWait * 0.55, 0, 0.65);
+    if (enemy.stamina < 0.98) this.notify('ENEMY STAMINA CARRIED', Colors.pink, .75);
+  }
+  return enemy;
+};
+
+const oldChooseRelic = Game.prototype.chooseRelic;
+Game.prototype.chooseRelic = function patchedChooseRelic(index) {
+  if (this.enemy && Number.isFinite(this.enemy.stamina)) {
+    this.enemyStaminaCarry = this.enemy.stamina;
+    this.enemyWaitCarry = Number.isFinite(this.enemy.wait) ? this.enemy.wait : 0;
+  }
+  oldChooseRelic.call(this, index);
 };
 
 Renderer.prototype.spinViz = function spinViz(x, y, radius, spin, speed = 0, alpha = 1) {
