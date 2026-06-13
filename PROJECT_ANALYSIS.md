@@ -1,7 +1,13 @@
-# Project analysis and multiplayer reimplementation
+# Hosting fix analysis
 
-The previous `tt` repository was a static single-player roguelike paddle game. The visible project history emphasized a quantum roguelike overhaul with spin, bosses, relics, and playability polish.
+The previous compact upload could technically open a socket but did not prove the host-room path in its smoke test and did not clearly show players that hosting succeeded. This caused two usability failures: hosting appeared ambiguous, and clients had nothing useful to do while waiting.
 
-This reimplementation keeps the roguelike paddle-combat loop but changes the architecture for remote play. The Node server is authoritative, creates rooms, detects LAN invite links, can request a public tunnel link from inside the app, receives player input over WebSocket, simulates the field, and broadcasts snapshots to all clients.
+The fix changes the lobby model:
 
-The result is easier hosting: start the app, press Host, copy/share the generated link, and friends join from that link.
+- Creating a room returns an explicit `host-created` state.
+- The UI displays `You are hosting`, room code, invite link, all detected links, player count, and room status.
+- Non-host players see `Connected to host` and a waiting message.
+- While room phase is `lobby`, every client runs a local single-player practice field.
+- Host settings remain editable during lobby and broadcast to all players.
+- Only the host can start the synchronized multiplayer run.
+- The smoke test now covers the actual host-room path, friend join, configuration broadcast, and start transition.
