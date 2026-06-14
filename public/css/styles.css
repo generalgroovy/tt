@@ -39,3 +39,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .upgrade-panel span { display: inline-block; margin-bottom: 7px; color: var(--cyan); font-size: 11px; text-transform: uppercase; letter-spacing: .12em; }
 .bottom-bar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 9px 14px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; background: rgba(5,7,20,.58); color: var(--muted); font-size: 12px; backdrop-filter: blur(12px); }
 @media (max-width: 820px) { .hud { left: 10px; right: 10px; top: auto; bottom: 10px; width: auto; max-height: 58vh; } .upgrade-panel { left: 10px; right: 10px; top: 10px; width: auto; } .grid-two { grid-template-columns: 1fr; } .bottom-bar { display: none; } }
+.onboarding { margin: 10px 0; padding: 10px; border: 1px solid rgba(128,247,255,.24); border-radius: 15px; color: #d9fdff; background: rgba(128,247,255,.10); font-size: 13px; line-height: 1.35; }
+.ready-strip { margin: 9px 0; padding: 9px 10px; border-radius: 999px; text-align: center; font-weight: 950; letter-spacing: .04em; background: linear-gradient(90deg, rgba(128,247,255,.16), rgba(255,209,102,.14)); border: 1px solid rgba(255,255,255,.15); }
+button.armed { background: linear-gradient(135deg, var(--green), #d7ffde); color: #06180d; border-color: var(--green); }
+.diagnostics { padding: 10px; margin-top: 8px; border-radius: 14px; background: rgba(0,0,0,.24); color: var(--muted); font-size: 12px; line-height: 1.5; }
