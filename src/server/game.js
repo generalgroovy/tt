@@ -51,7 +51,10 @@ export function createGameState({ hostPeerId, createMessage, linkBases, existing
     blocks: [],
     hazards: [],
     upgrades: [],
-    history: []
+    history: [],
+    countdownEndsAt: 0,
+    runStats: { shots: 0, saves: 0, misses: 0, blocks: 0, levelClears: 0, bestCombo: 0, startedAt: 0, endedAt: 0 },
+    lastEvent: 'Lobby created. Practice is live.'
   };
 }
 
@@ -167,9 +170,15 @@ export function configureRoom(room, settings) {
   if (settings.maxPlayers != null) room.settings.maxPlayers = clamp(Number(settings.maxPlayers), 1, MAX_PLAYERS);
   if (settings.difficulty != null) room.settings.difficulty = clamp(Number(settings.difficulty), 1, 8);
   if (settings.targetLevel != null) room.settings.targetLevel = clamp(Number(settings.targetLevel), 3, 80);
-  if (room.settings.mode === 'coop') for (const p of room.players.values()) p.team = 'left';
+  if (room.settings.mode === 'coop') {
+    for (const p of room.players.values()) p.team = 'left';
+  } else {
+    [...room.players.values()].forEach((p, index) => { p.team = index % 2 === 0 ? 'left' : 'right'; });
+  }
+  for (const p of room.players.values()) p.ready = false;
   rebalanceSlots(room);
-  room.serverMessage = 'Host configuration updated. Practice continues until Start.';
+  room.serverMessage = 'Host configuration updated. Ready states reset; practice continues until Start.';
+  room.lastEvent = 'Lobby settings changed.';
 }
 
 export function setPlayerRole(room, playerId, role) {
@@ -184,7 +193,15 @@ export function setPlayerTeam(room, playerId, team) {
   const player = room.players.get(playerId);
   if (!player || room.phase !== 'lobby' || room.settings.mode !== 'versus') return;
   player.team = team === 'right' ? 'right' : 'left';
+  room.lastEvent = `${player.name} moved to ${player.team}.`;
   rebalanceSlots(room);
+}
+
+export function setPlayerReady(room, playerId, ready) {
+  const player = room.players.get(playerId);
+  if (!player || room.phase !== 'lobby') return;
+  player.ready = !!ready;
+  room.lastEvent = `${player.name} is ${player.ready ? 'ready' : 'not ready'}.`;
 }
 
 export function setInput(room, playerId, message) {
@@ -194,16 +211,30 @@ export function setInput(room, playerId, message) {
 }
 
 export function startRoom(room) {
-  room.phase = 'playing';
-  room.serverMessage = 'Host started the run. Multiplayer sync active.';
+  room.phase = 'countdown';
+  room.countdownEndsAt = Date.now() + 3000;
+  room.serverMessage = 'Launch countdown started. Finish your practice rally.';
   room.level = Math.max(1, room.level);
   room.hp = room.maxHp;
+  room.score = 0;
+  room.combo = 0;
+  room.rally = 0;
+  room.runStats = { shots: 0, saves: 0, misses: 0, blocks: 0, levelClears: 0, bestCombo: 0, startedAt: 0, endedAt: 0 };
+  for (const p of room.players.values()) p.ready = false;
   resetField(room);
 }
 
 export function stepRoom(room, dt) {
+  if (room.phase === 'countdown') {
+    if (Date.now() >= room.countdownEndsAt) {
+      room.phase = 'playing';
+      room.runStats.startedAt = Date.now();
+      room.serverMessage = 'Run live. Build rally, protect HP, clear the room.';
+      room.lastEvent = 'Multiplayer run launched.';
+    } else return;
+  }
   if (room.phase !== 'playing') return;
-  const speedBoost = 1 + room.level * 0.018 + room.settings.difficulty * 0.02;
+  const speedBoost = 1 + room.level * 0.014 + room.settings.difficulty * 0.015;
   for (const player of room.players.values()) updatePlayer(room, player, dt);
   for (const ball of room.balls) updateBall(room, ball, dt, speedBoost);
   room.balls = room.balls.slice(0, 8);
@@ -236,6 +267,7 @@ function updateBall(room, ball, dt, speedBoost) {
   ball.x += ball.vx * dt;
   ball.y += ball.vy * dt;
   ball.spin *= room.mods.calm ? 0.998 : 0.995;
+  capBallSpeed(ball, 850 + room.level * 18 + room.settings.difficulty * 18);
   if (ball.y < 30 || ball.y > ARENA.height - 30) {
     ball.y = clamp(ball.y, 30, ARENA.height - 30);
     ball.vy *= -1;
@@ -260,12 +292,21 @@ function updateBall(room, ball, dt, speedBoost) {
 function launchBall(room, ball, holder, speedBoost) {
   const role = ROLES[holder.role];
   ball.held = false;
-  ball.vx = (holder.team === 'left' ? 1 : -1) * 520 * speedBoost * room.mods.speed * (room.mods.overdrive && holder.energy >= 1 ? 1.12 : 1);
-  ball.vy = holder.input.spin * 230 * role.spin;
+  ball.vx = (holder.team === 'left' ? 1 : -1) * 470 * speedBoost * room.mods.speed * (room.mods.overdrive && holder.energy >= 1 ? 1.12 : 1);
+  ball.vy = holder.input.spin * 205 * role.spin;
   ball.spin = holder.input.spin * role.spin * room.mods.spin;
   ball.damage = role.power;
   ball.lastHitBy = holder.id;
   if (room.mods.overdrive && holder.energy >= 1) holder.energy = 0;
+}
+
+function capBallSpeed(ball, maxSpeed) {
+  const speed = Math.hypot(ball.vx, ball.vy);
+  if (speed > maxSpeed) {
+    const scale = maxSpeed / speed;
+    ball.vx *= scale;
+    ball.vy *= scale;
+  }
 }
 
 function collideHazards(room, ball, dt) {
@@ -307,9 +348,13 @@ function collidePlayers(room, ball) {
       ball.lastHitBy = player.id;
       room.lastHitter = player.id;
       player.energy = clamp(player.energy + 0.08 * room.mods.chargeRate, 0, 1);
+      room.runStats.shots += 1;
+      room.runStats.saves += 1;
+      room.lastEvent = `${player.name} returned the ball.`;
       room.rally += 1;
       room.combo = Math.min(99, room.combo + 1);
       room.score += Math.round(8 + room.combo * room.mods.combo);
+      room.runStats.bestCombo = Math.max(room.runStats.bestCombo, room.combo);
       if (room.mods.vamp && room.rally % 18 === 0) room.hp = clamp(room.hp + 1, 1, room.maxHp);
     }
   }
@@ -324,6 +369,7 @@ function collideBlocks(room, ball) {
     else ball.pierce -= 1;
     ball.vy += rand(-80, 80);
     room.score += 20 + room.combo;
+    room.runStats.blocks += 1;
     if (block.hp > 0) continue;
     room.blocks.splice(i, 1);
     if (block.type === 'heal') room.hp = clamp(room.hp + 1, 1, room.maxHp);
@@ -334,11 +380,14 @@ function collideBlocks(room, ball) {
 }
 
 function applyMiss(room) {
+  room.runStats.misses += 1;
   if (room.shields > 0) {
     room.shields -= 1;
+    room.lastEvent = 'Shield absorbed a miss.';
     return;
   }
   room.hp -= 1;
+  room.lastEvent = 'Missed ball. Shared HP lost.';
   room.combo = 0;
   room.rally = 0;
 }
@@ -347,6 +396,7 @@ function handleLevelState(room) {
   if (room.enemyHp <= 0 || (room.settings.mode === 'versus' && room.score >= room.level * 320)) {
     if (room.level >= room.settings.targetLevel) {
       room.phase = 'lobby';
+      room.runStats.endedAt = Date.now();
       room.serverMessage = 'Run cleared. Hosting remains active; configure another run.';
       room.level = 1;
       room.hp = room.maxHp;
@@ -354,12 +404,15 @@ function handleLevelState(room) {
       resetField(room);
     } else {
       room.phase = 'upgrade';
+      room.runStats.levelClears += 1;
       room.upgrades = createUpgradeDraft(room);
       room.serverMessage = 'Level clear. Host chooses one of five upgrades.';
+      room.lastEvent = `Level ${room.level} cleared.`;
     }
   }
   if (room.hp <= 0) {
     room.phase = 'lobby';
+    room.runStats.endedAt = Date.now();
     room.serverMessage = 'Run failed. Hosting remains active; practice lobby restored.';
     room.level = 1;
     room.hp = room.maxHp;
@@ -375,6 +428,10 @@ export function serializeRoom(room, linkToInvite) {
     phase: room.phase,
     serverMessage: room.serverMessage,
     settings: room.settings,
+    countdown: room.phase === 'countdown' ? Math.max(0, Math.ceil((room.countdownEndsAt - Date.now()) / 1000)) : 0,
+    ready: { count: [...room.players.values()].filter(p => p.ready).length, total: room.players.size },
+    runStats: room.runStats,
+    lastEvent: room.lastEvent,
     roles: Object.fromEntries(Object.entries(ROLES).map(([key, value]) => [key, { label: value.label, trait: value.trait }])),
     level: room.level,
     hp: room.hp,
