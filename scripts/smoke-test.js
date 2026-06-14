@@ -30,12 +30,12 @@ const base = `http://127.0.0.1:${port}`;
 const html = await fetch(base).then(r => r.text());
 if (!html.includes('Relay Rift')) throw new Error('HTML shell did not load');
 const health = await fetch(`${base}/api/health`).then(r => r.json());
-if (!health.ok || health.maxPlayers !== 8) throw new Error('Health endpoint failed');
+if (!health.ok || health.maxPlayers !== 8 || health.version !== '2.2.0-alpha') throw new Error('Health endpoint failed');
 
 const host = await openSocket(port);
 host.send({ type: 'create', name: 'Host', mode: 'versus', maxPlayers: 8, difficulty: 4, targetLevel: 6, role: 'guard' });
 const lobby = await latestState(host, s => s.phase === 'lobby' && s.serverMessage.includes('Hosting active') && s.invites.length);
-if (lobby.settings.maxPlayers !== 8) throw new Error('8-player lobby not created');
+if (lobby.settings.maxPlayers !== 8 || lobby.ready.total !== 1) throw new Error('8-player lobby not created');
 
 const clients = [host];
 const roles = ['striker', 'runner', 'vector', 'anchor', 'chaos', 'guard', 'runner'];
@@ -49,10 +49,15 @@ const full = await latestState(host, s => s.players.length === 8);
 if (full.players.filter(p => p.team === 'left').length !== 4) throw new Error('Left team not balanced');
 if (full.players.filter(p => p.team === 'right').length !== 4) throw new Error('Right team not balanced');
 
+host.send({ type: 'ready', ready: true });
+await latestState(host, s => s.ready.count >= 1 && s.phase === 'lobby');
 host.send({ type: 'configure', settings: { difficulty: 5, targetLevel: 18 } });
-await latestState(host, s => s.settings.difficulty === 5 && s.phase === 'lobby');
+await latestState(host, s => s.settings.difficulty === 5 && s.ready.count === 0 && s.phase === 'lobby');
+host.send({ type: 'ready', ready: true });
+await latestState(host, s => s.ready.count >= 1 && s.phase === 'lobby');
 host.send({ type: 'start' });
-await latestState(host, s => s.phase === 'playing');
+await latestState(host, s => s.phase === 'countdown' && s.countdown > 0);
+await latestState(host, s => s.phase === 'playing' && s.runStats.startedAt, 4200);
 
 const draft = createUpgradeDraft({ history: [], settings: { draftSize: 5 }, players: new Map(), mods: baseMods() });
 if (draft.length !== 5) throw new Error('Upgrade draft is not five cards');
@@ -60,4 +65,4 @@ if (draft.length !== 5) throw new Error('Upgrade draft is not five cards');
 for (const client of clients) client.ws.close();
 await delay(80);
 server.close();
-console.log('Smoke test passed: modular app, 8-player lobby, mirrored teams, launch, 5-card upgrade draft.');
+console.log('Smoke test passed: alpha lobby readiness, 8-player mirrored teams, countdown launch, diagnostics, 5-card draft.');
