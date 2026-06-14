@@ -7,7 +7,7 @@ import { networkInterfaces } from 'node:os';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
   addPlayer, chooseUpgrade, configureRoom, createGameState, resetField, serializeRoom,
-  setInput, setPlayerRole, setPlayerTeam, startRoom, stepRoom
+  setInput, setPlayerReady, setPlayerRole, setPlayerTeam, startRoom, stepRoom
 } from './game.js';
 import { TICK_HZ } from './constants.js';
 
@@ -81,7 +81,7 @@ export function createServerApp({ port = 8080 } = {}) {
 
   const server = createServer(async (request, response) => {
     try {
-      if (request.url === '/api/health') return writeJson(response, 200, { ok: true, rooms: rooms.size, peers: peers.size, maxPlayers: 8 });
+      if (request.url === '/api/health') return writeJson(response, 200, { ok: true, version: '2.2.0-alpha', rooms: rooms.size, peers: peers.size, maxPlayers: 8 });
       if (request.url === '/api/links') return writeJson(response, 200, { links: linkBases(request, port, tunnel.url), tunnel });
       if (request.url === '/api/public' && request.method === 'POST') return writeJson(response, 200, await createPublicLink(request));
       return serveStatic(request, response);
@@ -137,7 +137,8 @@ export function createServerApp({ port = 8080 } = {}) {
 
       if (message.type === 'input') return setInput(room, peer.id, message);
       if (message.type === 'configure' && isHost) { configureRoom(room, message.settings || {}); return broadcast(room, 'configured'); }
-      if (message.type === 'start' && isHost) { startRoom(room); return broadcast(room, 'started'); }
+      if (message.type === 'start' && isHost) { startRoom(room); return broadcast(room, 'countdown'); }
+      if (message.type === 'ready') { setPlayerReady(room, peer.id, message.ready); return broadcast(room, 'ready'); }
       if (message.type === 'role') { setPlayerRole(room, peer.id, message.role); return broadcast(room, 'role'); }
       if (message.type === 'team') { setPlayerTeam(room, peer.id, message.team); return broadcast(room, 'team'); }
       if (message.type === 'links' && isHost && Array.isArray(message.links)) { room.links = message.links.slice(0, 8); return broadcast(room, 'links'); }
