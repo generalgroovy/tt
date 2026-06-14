@@ -1,47 +1,94 @@
-# Relay Rift project upgrade analysis
+# Relay Rift Alpha Feedback Simulation and Optimization Pass
 
-This pass restructures the project from a monolithic experiment into a maintainable self-hosted browser game. The target is not a literal AAA-budget product; it is an AAA-inspired direction: cleaner architecture, better visual hierarchy, richer game verbs, smoother runtime, stronger lobby feedback, and tests that cover the multiplayer path.
+This pass treats the 2.1 build as beta and simulates early external feedback. The goal is not feature sprawl; it is converting the game into an alpha that communicates state clearly, survives common lobby confusion, feels less abrupt, and gives players useful feedback.
 
-## Structural upgrades
+## Simulated feedback
 
-- Small `server.js` entrypoint.
-- Dedicated `src/server/app.js` for HTTP, static files, WebSocket connection lifecycle, rooms, and public-link API.
-- Dedicated `src/server/game.js` for server-authoritative room state and simulation.
-- Dedicated `src/server/constants.js` for arena constants, roles, and upgrades.
-- Dedicated `public` asset tree for HTML, CSS, and client runtime.
-- Integration smoke test separated under `scripts`.
+### New player
 
-## Runtime upgrades
+- “I do not know what to do first.”
+- “I joined but I am not sure whether I am waiting or playing.”
+- “The role names sound interesting, but I need stronger status feedback.”
 
-- Uses the `ws` library for WebSocket reliability rather than handwritten protocol parsing.
-- Keeps authoritative simulation on the server.
-- Broadcasts compact snapshots.
-- Client interpolates player and ball positions between snapshots for smoother perceived motion.
-- Practice lobby stays local and fluid before the synchronized run starts.
+Implemented response:
 
-## Presentation upgrades
+- Added first-run onboarding text.
+- Kept practice playable in lobby.
+- Added visible ready strip and clearer lobby status wording.
 
-- Full-screen canvas with layered radial background, glowing grid, midpoint line, and bloom-like canvas effects.
-- Glass-panel lobby and HUD treatment.
-- Clear room state, host state, invite state, player roster, energy bars, and upgrade cards.
-- Responsive layout that keeps the playfield readable on smaller screens.
+### Host
 
-## Game-design upgrades
+- “Hosting works, but I need stronger proof that the room is actually active.”
+- “Starting the run is too sudden.”
+- “When I change settings, old ready states should not remain valid.”
 
-- 8-player support.
-- Mirrored 4-vs-4 competitive geometry around the midpoint.
-- Role identity: Guard, Striker, Runner, Vector, Anchor, Chaos.
-- Energy meter, shields, combo, rally economy, role stats, ball damage, portals, central net, and multiple block types.
-- 5-card upgrade drafts with readable categories and effect text.
+Implemented response:
 
-## Next professional-grade milestones
+- Retained visible host state, room code, links, roster, and status feed.
+- Added ready state and ready counts.
+- Added countdown phase before multiplayer starts.
+- Host configuration now resets readiness.
 
-1. Deterministic seeded rooms for reproducible daily runs.
-2. Client-side prediction and reconciliation for paddle motion.
-3. Gamepad support and configurable input bindings.
-4. Sound design: hit layers, combo risers, low-health alarms, upgrade stingers.
-5. Boss system with telegraphed attacks and weak points.
-6. Spectator mode and reconnect tokens.
-7. Dedicated tutorial/training challenges.
-8. Performance panel for tick rate, ping, dropped frames, and room health.
-9. Full art pass: animated background layers, camera shake, transition scenes, and cinematic boss intros.
+### Competitive players
+
+- “Switching from co-op to versus should not leave everyone stacked on one side.”
+- “I need to audit team balance quickly.”
+
+Implemented response:
+
+- Versus configuration now redistributes teams left/right in alternating order.
+- Ready strip and roster make state easier to audit.
+
+### Co-op players
+
+- “Opening pace can get chaotic too quickly.”
+- “We need a way to understand why a run failed.”
+
+Implemented response:
+
+- Reduced opening ball speed.
+- Added server-side speed cap.
+- Added diagnostics: last event, shots, block hits, misses, best combo.
+
+### Performance-constrained laptop
+
+- “Glow and grid can be expensive.”
+
+Implemented response:
+
+- Added visual quality selector: High, Medium, Low/Laptop.
+- Low quality disables expensive shadows and grid rendering.
+
+## Implemented alpha changes
+
+- Versioned as `2.2.0-alpha`.
+- Health endpoint reports version.
+- Lobby ready state.
+- Launch countdown phase.
+- Readiness reset on host config changes.
+- Team redistribution when switching to versus.
+- Gentler ball launch and speed cap.
+- Run statistics and last-event telemetry.
+- Client diagnostics panel.
+- Client visual quality preset.
+- Stronger smoke test covering readiness and countdown.
+
+## Remaining alpha risks
+
+- The game still lacks deterministic seeded runs.
+- There is no reconnect token yet.
+- There is no audio pass yet.
+- There is no real tutorial mission sequence yet.
+- Client interpolation is simple and not full prediction/reconciliation.
+- Bosses are still systemic hazards rather than authored encounters.
+
+## Next recommended pass
+
+1. Add a tutorial ladder: serve, spin, save, split, portal, co-op role drill.
+2. Add deterministic seeds and daily run.
+3. Add reconnect tokens.
+4. Add gamepad support.
+5. Add authored boss encounters.
+6. Add sound design and camera feedback.
+7. Add player ping/latency and server tick diagnostics.
+8. Add post-run summary overlay with MVP callouts.
