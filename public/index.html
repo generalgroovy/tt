@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Relay Rift</title>
+  <title>Relay Rift Super-Duper Alpha</title>
   <link rel="stylesheet" href="/css/styles.css" />
 </head>
 <body>
@@ -11,83 +11,57 @@
   <div id="vignette"></div>
   <main id="hud" class="hud">
     <header class="brand">
-      <div>
-        <p class="kicker">That’s a Paddlin’</p>
-        <h1>Relay Rift</h1>
-      </div>
+      <div><p class="kicker">That’s a Paddlin’</p><h1>Relay Rift <span class="super">SUPER-DUPER ALPHA</span></h1></div>
       <div id="connectionBadge" class="badge offline">offline</div>
     </header>
-
     <section id="homePanel" class="panel-card">
-      <p class="muted">AAA-inspired self-hostable paddle raid. Solo practice, 8-player co-op, mirrored 4v4 roguelike versus.</p>
+      <p class="muted">Release-prep paddle raid: learn one skill at a time, launch instantly with bots, then grow into co-op and mirrored versus.</p>
       <label>Callsign <input id="nameInput" maxlength="18" placeholder="Player" /></label>
+      <label>Preset <select id="presetInput"><option value="academy">Academy Path</option><option value="firstRun">First Run</option><option value="quickRaid" selected>Quick Raid</option><option value="mirrorDuel">Mirror Duel 4v4</option><option value="chaosLab">Chaos Lab</option><option value="riftSprint">Rift Sprint</option><option value="bossRush">Boss Rush</option></select></label>
+      <label class="checkline"><input id="tutorialInput" type="checkbox" checked /> Guided Tutorial overlay for co-op / versus starts</label>
       <div class="grid-two">
-        <label>Mode
-          <select id="modeInput"><option value="coop">Co-op Raid</option><option value="versus">Mirror Versus</option></select>
-        </label>
-        <label>Players
-          <select id="maxInput"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option selected>8</option></select>
-        </label>
+        <label>Mode <select id="modeInput"><option value="coop">Co-op Raid</option><option value="versus">Mirror Versus</option></select></label>
+        <label>Players <select id="maxInput"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option selected>8</option></select></label>
       </div>
       <div class="grid-two">
         <label>Role <select id="roleInput"></select></label>
-        <label>Difficulty
-          <select id="difficultyInput"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select>
-        </label>
+        <label>Difficulty <select id="difficultyInput"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
       </div>
-      <div class="grid-two">
-        <label>Target Level
-          <select id="targetInput"><option>6</option><option selected>18</option><option>30</option><option>50</option><option>80</option></select>
-        </label>
-        <button id="hostButton" class="primary" disabled>Host Room</button>
-      </div>
+      <div class="grid-two"><button id="quickStartButton" class="primary big" disabled>Instant Run + Bots</button><button id="hostButton" disabled>Host Lobby</button></div>
       <div class="join-row"><input id="roomInput" placeholder="ROOM" maxlength="6" /><button id="joinButton" disabled>Join</button></div>
-      <div class="onboarding"><b>First run:</b> Host or join, practice locally, press Ready, then host launches after countdown.</div>
+      <div class="onboarding"><b>Skill ladder:</b> Academy teaches serve → spin → dash → blocks → missions → upgrades → team play. Co-op and Mirror Versus can also start with Guided Tutorial on, or you can disable it for free play.</div>
       <p id="notice" class="muted"></p>
     </section>
-
     <section id="roomPanel" class="panel-card hidden">
-      <div class="room-head">
-        <div>
-          <p class="kicker">Room Status</p>
-          <h2 id="hostStatus">Waiting</h2>
-        </div>
-        <button id="roomCodeButton" class="code">-----</button>
-      </div>
+      <div class="room-head"><div><p class="kicker">Room Status</p><h2 id="hostStatus">Waiting</h2></div><button id="roomCodeButton" class="code">-----</button></div>
       <div id="roomMessage" class="status">Room inactive.</div>
+      <div id="directorTip" class="director">Tip: serve safely, then curve with A/D.</div>
+      <div id="missionStatus" class="mission">Mission: initializing contract.</div>
+      <div id="skillStatus" class="skill-card">Skill: initializing lesson.</div>
       <div id="readyStrip" class="ready-strip">Ready 0/0 · lobby</div>
       <label>Invite Link <input id="inviteInput" readonly /></label>
       <div class="grid-two"><button id="copyInviteButton">Copy Invite</button><button id="shareButton">Share</button></div>
       <div class="grid-two"><button id="publicButton" class="primary">Make Public Link</button><button id="refreshLinksButton">Refresh Links</button></div>
       <details><summary>All detected links</summary><div id="allLinks" class="link-list"></div></details>
-
       <div id="hostControls" class="host-controls hidden">
         <p class="kicker">Host Configuration</p>
-        <p class="muted">Everyone keeps practicing while these settings change.</p>
-        <div class="grid-two">
-          <label>Mode <select id="lobbyModeInput"><option value="coop">Co-op Raid</option><option value="versus">Mirror Versus</option></select></label>
-          <label>Players <select id="lobbyMaxInput"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
-        </div>
-        <div class="grid-two">
-          <label>Difficulty <select id="lobbyDifficultyInput"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label>
-          <label>Target <select id="lobbyTargetInput"><option>6</option><option>18</option><option>30</option><option>50</option><option>80</option></select></label>
-        </div>
-        <button id="startButton" class="primary big">Launch Multiplayer Run</button>
+        <div class="grid-two"><label>Preset <select id="lobbyPresetInput"><option value="academy">Academy Path</option><option value="firstRun">First Run</option><option value="quickRaid">Quick Raid</option><option value="mirrorDuel">Mirror Duel</option><option value="chaosLab">Chaos Lab</option><option value="riftSprint">Rift Sprint</option><option value="bossRush">Boss Rush</option></select></label><label>Mode <select id="lobbyModeInput"><option value="coop">Co-op Raid</option><option value="versus">Mirror Versus</option></select></label></div>
+        <div class="grid-two"><label>Players <select id="lobbyMaxInput"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label><label>Difficulty <select id="lobbyDifficultyInput"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></label></div>
+        <label class="checkline"><input id="lobbyTutorialInput" type="checkbox" /> Guided Tutorial for this co-op / versus room</label>
+        <div class="grid-two"><button id="fillBotsButton">Fill Empty With Bots</button><button id="removeBotsButton">Remove Bots</button></div>
+        <div class="grid-two"><button id="quickLaunchButton" class="primary">Quick Launch</button><button id="startButton" class="primary">Countdown Start</button></div>
       </div>
-
       <p id="waitingMessage" class="status hidden">Waiting for host. Practice locally.</p>
       <div class="grid-two"><label>Your Role <select id="lobbyRoleInput"></select></label><button id="readyButton" class="primary">Ready</button></div>
       <div class="grid-two"><button id="leftButton">Left Team</button><button id="rightButton">Right Team</button></div>
       <label>Visual Quality <select id="qualityInput"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low / laptop</option></select></label>
       <button id="leaveButton">Leave Room</button>
-      <details><summary>Run summary / diagnostics</summary><div id="diagnostics" class="diagnostics">No run data yet.</div></details>
-      <p class="kicker">Squad</p>
-      <div id="playerList" class="player-list"></div>
+      <details open><summary>Run summary / diagnostics</summary><div id="diagnostics" class="diagnostics">No run data yet.</div></details>
+      <p class="kicker">Squad</p><div id="playerList" class="player-list"></div>
     </section>
   </main>
-
   <aside id="upgradePanel" class="upgrade-panel hidden"></aside>
-  <div id="bottomBar" class="bottom-bar">Solo practice active · click/space to serve · W/S or mouse to move · A/D to spin</div>
-  <script type="module" src="/js/alpha-main.js"></script>
+  <div id="bottomBar" class="bottom-bar">Academy: learn one mechanic at a time · Space/click serve · A/D spin · Shift dash</div>
+  <script type="module" src="/js/main.js"></script>
 </body>
 </html>
