@@ -12,26 +12,13 @@ import { PRESETS, TICK_HZ, VERSION } from './constants.js';
 
 const ROOT = normalize(join(fileURLToPath(new URL('.', import.meta.url)), '../..'));
 const PUBLIC = join(ROOT, 'public');
-const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'application/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.ico': 'image/x-icon'
-};
+const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8' };
 const peerId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const cleanRoom = room => String(room || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 function writeJson(response, status, body) {
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   response.end(JSON.stringify(body));
-}
-
-async function readJson(request) {
-  const chunks = [];
-  for await (const chunk of request) chunks.push(chunk);
-  if (!chunks.length) return {};
-  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
 function requestOrigin(request, port) {
@@ -49,10 +36,17 @@ function linkBases(request, port) {
 }
 const inviteUrl = (base, roomCode) => `${base.replace(/\/$/, '')}/?room=${roomCode}`;
 
+async function readJsonBody(request) {
+  let body = '';
+  for await (const chunk of request) body += chunk;
+  if (!body.trim()) return {};
+  return JSON.parse(body);
+}
+
 async function serveStatic(request, response) {
   const url = new URL(request.url, 'http://local');
-  const pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
-  const filePath = normalize(join(PUBLIC, pathname));
+  const path = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
+  const filePath = normalize(join(PUBLIC, path));
   if (!filePath.startsWith(PUBLIC) || !existsSync(filePath)) {
     response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
     response.end('Not found');
@@ -67,33 +61,25 @@ export function createServerApp({ port = 8080 } = {}) {
   const rooms = new Map();
   const peers = new Map();
 
-  function getPeer(id) {
-    if (!id || !peers.has(id)) {
-      const peer = { id: peerId(), room: '', response: null, request: null, lastSeen: Date.now() };
-      peers.set(peer.id, peer);
-      return peer;
-    }
-    const peer = peers.get(id);
-    peer.lastSeen = Date.now();
-    return peer;
-  }
-
-  function sse(peer, payload) {
-    if (!peer?.response || peer.response.destroyed) return;
-    peer.response.write(`data: ${JSON.stringify(payload)}\n\n`);
-  }
+  const send = (peer, payload) => {
+    if (!peer?.response || peer.response.destroyed) return false;
+    peer.response.write(`event: message\ndata: ${JSON.stringify(payload)}\n\n`);
+    return true;
+  };
 
   function broadcast(room, reason = 'state') {
     const state = serializeRoom(room, inviteUrl);
     for (const id of room.players.keys()) {
       const peer = peers.get(id);
-      if (peer) sse(peer, { type: 'state', reason, state });
+      if (peer) send(peer, { type: 'state', reason, state });
     }
   }
 
-  function stateForPeer(peer) {
-    const room = rooms.get(peer.room);
-    return room ? serializeRoom(room, inviteUrl) : null;
+  function createPeer() {
+    const id = peerId();
+    const peer = { id, response: null, room: '', lastSeen: Date.now() };
+    peers.set(id, peer);
+    return peer;
   }
 
   function createRoomForPeer(peer, request, message, autoStart = false) {
@@ -108,98 +94,64 @@ export function createServerApp({ port = 8080 } = {}) {
     return room;
   }
 
-  function detachPeer(peer, removePlayer = true) {
-    if (!peer) return;
-    const room = rooms.get(peer.room);
-    peer.response = null;
-    if (!removePlayer || !room) return;
-    room.players.delete(peer.id);
-    if (!room.players.size || [...room.players.values()].every(p => p.bot)) rooms.delete(room.code);
-    else {
-      if (room.hostId === peer.id) room.hostId = [...room.players.keys()].find(id => !room.players.get(id)?.bot) || room.players.keys().next().value;
-      room.serverMessage = 'A player disconnected. Hosting remains active.';
-      broadcast(room, 'disconnect');
-    }
-    peer.room = '';
-  }
-
-  async function handleCommand(request, response) {
-    let message;
-    try { message = await readJson(request); }
-    catch { return writeJson(response, 400, { ok: false, message: 'Bad JSON.' }); }
-    const peer = getPeer(message.peerId || message.id);
-    let room;
-
-    if (message.type === 'create') {
-      room = createRoomForPeer(peer, request, message, false);
-      broadcast(room, 'host-created');
-      return writeJson(response, 200, { ok: true, id: peer.id, state: stateForPeer(peer) });
-    }
-    if (message.type === 'quickstart') {
-      room = createRoomForPeer(peer, request, message, true);
-      broadcast(room, 'quickstart');
-      return writeJson(response, 200, { ok: true, id: peer.id, state: stateForPeer(peer) });
-    }
+  function handleMessage(request, peer, message) {
+    peer.lastSeen = Date.now();
+    if (message.type === 'create') { broadcast(createRoomForPeer(peer, request, message, false), 'host-created'); return { ok: true }; }
+    if (message.type === 'quickstart') { broadcast(createRoomForPeer(peer, request, message, true), 'quickstart'); return { ok: true }; }
     if (message.type === 'join') {
-      room = rooms.get(cleanRoom(message.room));
-      if (!room) return writeJson(response, 404, { ok: false, id: peer.id, message: 'Room not found. Check the code or invite link.' });
-      if (!addPlayer(room, peer.id, { name: message.name, role: message.role })) return writeJson(response, 409, { ok: false, id: peer.id, message: 'Room is full.' });
+      const room = rooms.get(cleanRoom(message.room));
+      if (!room) return { ok: false, message: 'Room not found. Check the code or invite link.' };
+      if (!addPlayer(room, peer.id, { name: message.name, role: message.role })) return { ok: false, message: 'Room is full.' };
       peer.room = room.code;
       room.serverMessage = `${room.players.get(peer.id).name} joined. Practice lobby active.`;
       broadcast(room, 'player-joined');
-      return writeJson(response, 200, { ok: true, id: peer.id, state: stateForPeer(peer) });
+      return { ok: true };
     }
 
-    room = rooms.get(peer.room);
-    if (!room) return writeJson(response, 409, { ok: false, id: peer.id, message: 'You are not in a room.' });
+    const room = rooms.get(peer.room);
+    if (!room) return { ok: false, message: 'No active room.' };
     const isHost = room.hostId === peer.id;
-
-    if (message.type === 'input') setInput(room, peer.id, message);
-    else if (message.type === 'configure' && isHost) { configureRoom(room, message.settings || {}); broadcast(room, 'configured'); }
-    else if (message.type === 'fill_bots' && isHost) { fillBots(room, message.count || room.settings.maxPlayers); broadcast(room, 'bots-filled'); }
-    else if (message.type === 'remove_bots' && isHost) { removeBots(room); broadcast(room, 'bots-removed'); }
-    else if (message.type === 'quick_launch' && isHost) { quickStartRoom(room); broadcast(room, 'quick-launch'); }
-    else if (message.type === 'start' && isHost) { startRoom(room); broadcast(room, 'countdown'); }
-    else if (message.type === 'ready') { setPlayerReady(room, peer.id, message.ready); broadcast(room, 'ready'); }
-    else if (message.type === 'role') { setPlayerRole(room, peer.id, message.role); broadcast(room, 'role'); }
-    else if (message.type === 'team') { setPlayerTeam(room, peer.id, message.team); broadcast(room, 'team'); }
-    else if (message.type === 'links' && isHost && Array.isArray(message.links)) { room.links = message.links.slice(0, 8); broadcast(room, 'links'); }
-    else if (message.type === 'upgrade' && isHost && room.phase === 'upgrade') { chooseUpgrade(room, Number(message.index)); broadcast(room, 'upgrade'); }
-    else if (message.type === 'leave') { detachPeer(peer, true); return writeJson(response, 200, { ok: true, id: peer.id }); }
-    else if (!['input'].includes(message.type)) return writeJson(response, 403, { ok: false, id: peer.id, message: isHost ? 'Unknown command.' : 'Host-only command or unknown command.' });
-
-    return writeJson(response, 200, { ok: true, id: peer.id, state: stateForPeer(peer) });
+    if (message.type === 'input') { setInput(room, peer.id, message); return { ok: true }; }
+    if (message.type === 'configure' && isHost) { configureRoom(room, message.settings || {}); broadcast(room, 'configured'); return { ok: true }; }
+    if (message.type === 'fill_bots' && isHost) { fillBots(room, message.count || room.settings.maxPlayers); broadcast(room, 'bots-filled'); return { ok: true }; }
+    if (message.type === 'remove_bots' && isHost) { removeBots(room); broadcast(room, 'bots-removed'); return { ok: true }; }
+    if (message.type === 'quick_launch' && isHost) { quickStartRoom(room); broadcast(room, 'quick-launch'); return { ok: true }; }
+    if (message.type === 'start' && isHost) { startRoom(room); broadcast(room, 'countdown'); return { ok: true }; }
+    if (message.type === 'ready') { setPlayerReady(room, peer.id, message.ready); broadcast(room, 'ready'); return { ok: true }; }
+    if (message.type === 'role') { setPlayerRole(room, peer.id, message.role); broadcast(room, 'role'); return { ok: true }; }
+    if (message.type === 'team') { setPlayerTeam(room, peer.id, message.team); broadcast(room, 'team'); return { ok: true }; }
+    if (message.type === 'links' && isHost && Array.isArray(message.links)) { room.links = message.links.slice(0, 8); broadcast(room, 'links'); return { ok: true }; }
+    if (message.type === 'upgrade' && isHost && room.phase === 'upgrade') { chooseUpgrade(room, Number(message.index)); broadcast(room, 'upgrade'); return { ok: true }; }
+    return { ok: false, message: 'Ignored or host-only action.' };
   }
 
   const server = createServer(async (request, response) => {
     try {
       const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
-      if (request.method === 'GET' && url.pathname === '/api/health') return writeJson(response, 200, { ok: true, transport: 'sse-http', dependencyFree: true, version: VERSION, rooms: rooms.size, peers: peers.size, maxPlayers: 8, presets: Object.keys(PRESETS) });
-      if (request.method === 'GET' && url.pathname === '/api/session') {
-        const peer = getPeer(url.searchParams.get('id'));
-        return writeJson(response, 200, { ok: true, id: peer.id, version: VERSION, transport: 'sse-http' });
+      if (request.method === 'OPTIONS') return writeJson(response, 200, { ok: true });
+      if (url.pathname === '/api/health') return writeJson(response, 200, { ok: true, version: VERSION, rooms: rooms.size, peers: peers.size, maxPlayers: 8, presets: Object.keys(PRESETS), transport: 'sse', dependencies: [] });
+      if (url.pathname === '/api/links') return writeJson(response, 200, { links: linkBases(request, port), tunnel: { status: 'none', url: '', error: '' }, message: 'Local-network links only. Share a listed link with players on the same Wi-Fi/network.' });
+      if (url.pathname === '/api/public' && request.method === 'POST') return writeJson(response, 200, { ok: true, links: linkBases(request, port), tunnel: { status: 'none', url: '', error: '' }, message: 'Local-network links are ready. Share a listed link with players on the same network.' });
+      if (url.pathname === '/api/session' && request.method === 'POST') return writeJson(response, 200, { ok: true, id: createPeer().id, version: VERSION });
+      if (url.pathname === '/api/message' && request.method === 'POST') {
+        const message = await readJsonBody(request);
+        const peer = peers.get(String(message.id || '')) || createPeer();
+        const result = handleMessage(request, peer, message);
+        if (!result.ok && peer.response) send(peer, { type: 'error', message: result.message });
+        return writeJson(response, result.ok ? 200 : 400, { ...result, id: peer.id });
       }
-      if (request.method === 'GET' && url.pathname === '/api/links') return writeJson(response, 200, { links: linkBases(request, port), publicLink: false, message: 'Dependency-free build: share a detected LAN link with players on the same network.' });
-      if (request.method === 'POST' && url.pathname === '/api/public') return writeJson(response, 200, { ok: true, links: linkBases(request, port), publicLink: false, message: 'Dependency-free build: no tunnel dependency. Share the LAN link with players on the same network.' });
-      if (request.method === 'GET' && url.pathname === '/api/state') {
-        const peer = getPeer(url.searchParams.get('id'));
-        return writeJson(response, 200, { ok: true, id: peer.id, state: stateForPeer(peer) });
-      }
-      if (request.method === 'POST' && url.pathname === '/api/command') return handleCommand(request, response);
-      if (request.method === 'GET' && url.pathname === '/api/events') {
-        const peer = getPeer(url.searchParams.get('id'));
-        peer.request = request;
+      if (url.pathname === '/events') {
+        const id = String(url.searchParams.get('id') || '');
+        const peer = peers.get(id);
+        if (!peer) { response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }); response.end('Unknown session'); return; }
+        response.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store, no-transform', connection: 'keep-alive' });
         peer.response = response;
-        response.writeHead(200, {
-          'content-type': 'text/event-stream; charset=utf-8',
-          'cache-control': 'no-store, no-transform',
-          connection: 'keep-alive',
-          'x-accel-buffering': 'no'
-        });
-        sse(peer, { type: 'hello', id: peer.id, version: VERSION });
-        const state = stateForPeer(peer);
-        if (state) sse(peer, { type: 'state', reason: 'connected', state });
-        request.on('close', () => detachPeer(peer, false));
+        peer.lastSeen = Date.now();
+        send(peer, { type: 'hello', id: peer.id, version: VERSION });
+        const room = rooms.get(peer.room);
+        if (room) send(peer, { type: 'state', reason: 'reconnect', state: serializeRoom(room, inviteUrl) });
+        const heartbeat = setInterval(() => { if (!response.destroyed) response.write(': heartbeat\n\n'); }, 15000);
+        request.on('close', () => { clearInterval(heartbeat); if (peer.response === response) peer.response = null; });
         return;
       }
       return serveStatic(request, response);
@@ -210,6 +162,8 @@ export function createServerApp({ port = 8080 } = {}) {
   });
 
   const timer = setInterval(() => {
+    const now = Date.now();
+    for (const [id, peer] of peers) if (!peer.response && !peer.room && now - peer.lastSeen > 120000) peers.delete(id);
     for (const room of rooms.values()) {
       stepRoom(room, 1 / TICK_HZ);
       broadcast(room, 'tick');
