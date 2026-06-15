@@ -4,12 +4,12 @@ import { existsSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { networkInterfaces } from 'node:os';
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import {
-  addPlayer, chooseUpgrade, configureRoom, createGameState, resetField, serializeRoom,
-  setInput, setPlayerReady, setPlayerRole, setPlayerTeam, startRoom, stepRoom
+  addPlayer, chooseUpgrade, configureRoom, createGameState, fillBots, quickStartRoom, removeBots,
+  resetField, serializeRoom, setInput, setPlayerReady, setPlayerRole, setPlayerTeam, startRoom, stepRoom
 } from './game.js';
-import { TICK_HZ } from './constants.js';
+import { PRESETS, TICK_HZ, VERSION } from './constants.js';
 
 const ROOT = normalize(join(fileURLToPath(new URL('.', import.meta.url)), '../..'));
 const PUBLIC = join(ROOT, 'public');
@@ -36,10 +36,7 @@ function linkBases(request, port, tunnelUrl = '') {
   if (tunnelUrl) result.unshift(tunnelUrl.replace(/\/$/, '') + '/');
   return [...new Set(result)];
 }
-
-function inviteUrl(base, roomCode) {
-  return `${base.replace(/\/$/, '')}/?room=${roomCode}`;
-}
+const inviteUrl = (base, roomCode) => `${base.replace(/\/$/, '')}/?room=${roomCode}`;
 
 async function serveStatic(request, response) {
   const url = new URL(request.url, 'http://local');
@@ -81,7 +78,7 @@ export function createServerApp({ port = 8080 } = {}) {
 
   const server = createServer(async (request, response) => {
     try {
-      if (request.url === '/api/health') return writeJson(response, 200, { ok: true, version: '2.2.0-alpha', rooms: rooms.size, peers: peers.size, maxPlayers: 8 });
+      if (request.url === '/api/health') return writeJson(response, 200, { ok: true, version: VERSION, rooms: rooms.size, peers: peers.size, maxPlayers: 8, presets: Object.keys(PRESETS) });
       if (request.url === '/api/links') return writeJson(response, 200, { links: linkBases(request, port, tunnel.url), tunnel });
       if (request.url === '/api/public' && request.method === 'POST') return writeJson(response, 200, await createPublicLink(request));
       return serveStatic(request, response);
@@ -92,9 +89,7 @@ export function createServerApp({ port = 8080 } = {}) {
   });
 
   const socketServer = new WebSocketServer({ server, path: '/ws' });
-  function send(peer, payload) {
-    if (peer.ws.readyState === WebSocket.OPEN) peer.ws.send(JSON.stringify(payload));
-  }
+  const send = (peer, payload) => { if (peer.ws.readyState === WebSocket.OPEN) peer.ws.send(JSON.stringify(payload)); };
   function broadcast(room, reason = 'state') {
     const state = serializeRoom(room, inviteUrl);
     for (const id of room.players.keys()) {
@@ -103,24 +98,29 @@ export function createServerApp({ port = 8080 } = {}) {
     }
   }
 
+  function createRoomForPeer(peer, request, message, autoStart = false) {
+    if (peer.room && rooms.has(peer.room)) rooms.get(peer.room).players.delete(peer.id);
+    const room = createGameState({ hostPeerId: peer.id, createMessage: message, linkBases: linkBases(request, port, tunnel.url), existingRooms: rooms });
+    rooms.set(room.code, room);
+    addPlayer(room, peer.id, { name: message.name, role: message.role });
+    peer.room = room.code;
+    fillBots(room, message.fillTo || (autoStart ? room.settings.maxPlayers : Math.min(room.settings.maxPlayers, 1 + Number(room.settings.bots || 0))));
+    resetField(room);
+    if (autoStart) quickStartRoom(room);
+    return room;
+  }
+
   socketServer.on('connection', (ws, request) => {
     const peer = { id: peerId(), ws, request, room: '' };
     peers.set(peer.id, peer);
-    send(peer, { type: 'hello', id: peer.id });
+    send(peer, { type: 'hello', id: peer.id, version: VERSION });
 
     ws.on('message', raw => {
       let message;
       try { message = JSON.parse(String(raw)); } catch { return send(peer, { type: 'error', message: 'Bad message.' }); }
 
-      if (message.type === 'create') {
-        if (peer.room && rooms.has(peer.room)) rooms.get(peer.room).players.delete(peer.id);
-        const room = createGameState({ hostPeerId: peer.id, createMessage: message, linkBases: linkBases(request, port, tunnel.url), existingRooms: rooms });
-        rooms.set(room.code, room);
-        addPlayer(room, peer.id, { name: message.name, role: message.role });
-        peer.room = room.code;
-        resetField(room);
-        return broadcast(room, 'host-created');
-      }
+      if (message.type === 'create') return broadcast(createRoomForPeer(peer, request, message, false), 'host-created');
+      if (message.type === 'quickstart') return broadcast(createRoomForPeer(peer, request, message, true), 'quickstart');
 
       if (message.type === 'join') {
         const room = rooms.get(cleanRoom(message.room));
@@ -137,6 +137,9 @@ export function createServerApp({ port = 8080 } = {}) {
 
       if (message.type === 'input') return setInput(room, peer.id, message);
       if (message.type === 'configure' && isHost) { configureRoom(room, message.settings || {}); return broadcast(room, 'configured'); }
+      if (message.type === 'fill_bots' && isHost) { fillBots(room, message.count || room.settings.maxPlayers); return broadcast(room, 'bots-filled'); }
+      if (message.type === 'remove_bots' && isHost) { removeBots(room); return broadcast(room, 'bots-removed'); }
+      if (message.type === 'quick_launch' && isHost) { quickStartRoom(room); return broadcast(room, 'quick-launch'); }
       if (message.type === 'start' && isHost) { startRoom(room); return broadcast(room, 'countdown'); }
       if (message.type === 'ready') { setPlayerReady(room, peer.id, message.ready); return broadcast(room, 'ready'); }
       if (message.type === 'role') { setPlayerRole(room, peer.id, message.role); return broadcast(room, 'role'); }
@@ -149,9 +152,9 @@ export function createServerApp({ port = 8080 } = {}) {
       const room = rooms.get(peer.room);
       if (room) {
         room.players.delete(peer.id);
-        if (!room.players.size) rooms.delete(room.code);
+        if (!room.players.size || [...room.players.values()].every(p => p.bot)) rooms.delete(room.code);
         else {
-          if (room.hostId === peer.id) room.hostId = room.players.keys().next().value;
+          if (room.hostId === peer.id) room.hostId = [...room.players.keys()].find(id => !room.players.get(id)?.bot) || room.players.keys().next().value;
           room.serverMessage = 'A player disconnected. Hosting remains active.';
           broadcast(room, 'disconnect');
         }
