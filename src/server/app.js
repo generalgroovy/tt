@@ -4,7 +4,6 @@ import { existsSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { networkInterfaces } from 'node:os';
-import { WebSocket, WebSocketServer } from 'ws';
 import {
   addPlayer, chooseUpgrade, configureRoom, createGameState, fillBots, quickStartRoom, removeBots,
   resetField, serializeRoom, setInput, setPlayerReady, setPlayerRole, setPlayerTeam, startRoom, stepRoom
@@ -13,7 +12,13 @@ import { PRESETS, TICK_HZ, VERSION } from './constants.js';
 
 const ROOT = normalize(join(fileURLToPath(new URL('.', import.meta.url)), '../..'));
 const PUBLIC = join(ROOT, 'public');
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8' };
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.ico': 'image/x-icon'
+};
 const peerId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
 const cleanRoom = room => String(room || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
@@ -22,26 +27,32 @@ function writeJson(response, status, body) {
   response.end(JSON.stringify(body));
 }
 
+async function readJson(request) {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(chunk);
+  if (!chunks.length) return {};
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
 function requestOrigin(request, port) {
   const proto = String(request.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
   const host = String(request.headers['x-forwarded-host'] || request.headers.host || `localhost:${port}`).split(',')[0].trim();
   return `${proto}://${host}`;
 }
 
-function linkBases(request, port, tunnelUrl = '') {
+function linkBases(request, port) {
   const result = [requestOrigin(request, port) + '/'];
   for (const address of Object.values(networkInterfaces()).flat().filter(Boolean)) {
     if (address.family === 'IPv4' && !address.internal) result.push(`http://${address.address}:${port}/`);
   }
-  if (tunnelUrl) result.unshift(tunnelUrl.replace(/\/$/, '') + '/');
   return [...new Set(result)];
 }
 const inviteUrl = (base, roomCode) => `${base.replace(/\/$/, '')}/?room=${roomCode}`;
 
 async function serveStatic(request, response) {
   const url = new URL(request.url, 'http://local');
-  const path = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
-  const filePath = normalize(join(PUBLIC, path));
+  const pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
+  const filePath = normalize(join(PUBLIC, pathname));
   if (!filePath.startsWith(PUBLIC) || !existsSync(filePath)) {
     response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
     response.end('Not found');
@@ -55,52 +66,39 @@ async function serveStatic(request, response) {
 export function createServerApp({ port = 8080 } = {}) {
   const rooms = new Map();
   const peers = new Map();
-  const tunnel = { url: '', status: 'idle', error: '' };
 
-  async function createPublicLink(request) {
-    if (tunnel.url) return { ok: true, message: `Public link active: ${tunnel.url}`, links: linkBases(request, port, tunnel.url), tunnel };
-    try {
-      tunnel.status = 'starting';
-      const module = await import('localtunnel');
-      const localtunnel = module.default || module;
-      const instance = await localtunnel({ port });
-      tunnel.url = instance.url;
-      tunnel.status = 'ready';
-      tunnel.error = '';
-      instance.on('close', () => { tunnel.url = ''; tunnel.status = 'closed'; });
-      return { ok: true, message: `Public link active: ${tunnel.url}`, links: linkBases(request, port, tunnel.url), tunnel };
-    } catch (error) {
-      tunnel.status = 'error';
-      tunnel.error = 'Public link failed. Run npm install, then retry.';
-      return { ok: false, message: tunnel.error, detail: String(error?.message || error), links: linkBases(request, port, tunnel.url), tunnel };
+  function getPeer(id) {
+    if (!id || !peers.has(id)) {
+      const peer = { id: peerId(), room: '', response: null, request: null, lastSeen: Date.now() };
+      peers.set(peer.id, peer);
+      return peer;
     }
+    const peer = peers.get(id);
+    peer.lastSeen = Date.now();
+    return peer;
   }
 
-  const server = createServer(async (request, response) => {
-    try {
-      if (request.url === '/api/health') return writeJson(response, 200, { ok: true, version: VERSION, rooms: rooms.size, peers: peers.size, maxPlayers: 8, presets: Object.keys(PRESETS) });
-      if (request.url === '/api/links') return writeJson(response, 200, { links: linkBases(request, port, tunnel.url), tunnel });
-      if (request.url === '/api/public' && request.method === 'POST') return writeJson(response, 200, await createPublicLink(request));
-      return serveStatic(request, response);
-    } catch (error) {
-      response.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
-      response.end(String(error?.stack || error));
-    }
-  });
+  function sse(peer, payload) {
+    if (!peer?.response || peer.response.destroyed) return;
+    peer.response.write(`data: ${JSON.stringify(payload)}\n\n`);
+  }
 
-  const socketServer = new WebSocketServer({ server, path: '/ws' });
-  const send = (peer, payload) => { if (peer.ws.readyState === WebSocket.OPEN) peer.ws.send(JSON.stringify(payload)); };
   function broadcast(room, reason = 'state') {
     const state = serializeRoom(room, inviteUrl);
     for (const id of room.players.keys()) {
       const peer = peers.get(id);
-      if (peer) send(peer, { type: 'state', reason, state });
+      if (peer) sse(peer, { type: 'state', reason, state });
     }
+  }
+
+  function stateForPeer(peer) {
+    const room = rooms.get(peer.room);
+    return room ? serializeRoom(room, inviteUrl) : null;
   }
 
   function createRoomForPeer(peer, request, message, autoStart = false) {
     if (peer.room && rooms.has(peer.room)) rooms.get(peer.room).players.delete(peer.id);
-    const room = createGameState({ hostPeerId: peer.id, createMessage: message, linkBases: linkBases(request, port, tunnel.url), existingRooms: rooms });
+    const room = createGameState({ hostPeerId: peer.id, createMessage: message, linkBases: linkBases(request, port), existingRooms: rooms });
     rooms.set(room.code, room);
     addPlayer(room, peer.id, { name: message.name, role: message.role });
     peer.room = room.code;
@@ -110,57 +108,105 @@ export function createServerApp({ port = 8080 } = {}) {
     return room;
   }
 
-  socketServer.on('connection', (ws, request) => {
-    const peer = { id: peerId(), ws, request, room: '' };
-    peers.set(peer.id, peer);
-    send(peer, { type: 'hello', id: peer.id, version: VERSION });
+  function detachPeer(peer, removePlayer = true) {
+    if (!peer) return;
+    const room = rooms.get(peer.room);
+    peer.response = null;
+    if (!removePlayer || !room) return;
+    room.players.delete(peer.id);
+    if (!room.players.size || [...room.players.values()].every(p => p.bot)) rooms.delete(room.code);
+    else {
+      if (room.hostId === peer.id) room.hostId = [...room.players.keys()].find(id => !room.players.get(id)?.bot) || room.players.keys().next().value;
+      room.serverMessage = 'A player disconnected. Hosting remains active.';
+      broadcast(room, 'disconnect');
+    }
+    peer.room = '';
+  }
 
-    ws.on('message', raw => {
-      let message;
-      try { message = JSON.parse(String(raw)); } catch { return send(peer, { type: 'error', message: 'Bad message.' }); }
+  async function handleCommand(request, response) {
+    let message;
+    try { message = await readJson(request); }
+    catch { return writeJson(response, 400, { ok: false, message: 'Bad JSON.' }); }
+    const peer = getPeer(message.peerId || message.id);
+    let room;
 
-      if (message.type === 'create') return broadcast(createRoomForPeer(peer, request, message, false), 'host-created');
-      if (message.type === 'quickstart') return broadcast(createRoomForPeer(peer, request, message, true), 'quickstart');
+    if (message.type === 'create') {
+      room = createRoomForPeer(peer, request, message, false);
+      broadcast(room, 'host-created');
+      return writeJson(response, 200, { ok: true, id: peer.id, state: stateForPeer(peer) });
+    }
+    if (message.type === 'quickstart') {
+      room = createRoomForPeer(peer, request, message, true);
+      broadcast(room, 'quickstart');
+      return writeJson(response, 200, { ok: true, id: peer.id, state: stateForPeer(peer) });
+    }
+    if (message.type === 'join') {
+      room = rooms.get(cleanRoom(message.room));
+      if (!room) return writeJson(response, 404, { ok: false, id: peer.id, message: 'Room not found. Check the code or invite link.' });
+      if (!addPlayer(room, peer.id, { name: message.name, role: message.role })) return writeJson(response, 409, { ok: false, id: peer.id, message: 'Room is full.' });
+      peer.room = room.code;
+      room.serverMessage = `${room.players.get(peer.id).name} joined. Practice lobby active.`;
+      broadcast(room, 'player-joined');
+      return writeJson(response, 200, { ok: true, id: peer.id, state: stateForPeer(peer) });
+    }
 
-      if (message.type === 'join') {
-        const room = rooms.get(cleanRoom(message.room));
-        if (!room) return send(peer, { type: 'error', message: 'Room not found. Check the code or invite link.' });
-        if (!addPlayer(room, peer.id, { name: message.name, role: message.role })) return send(peer, { type: 'error', message: 'Room is full.' });
-        peer.room = room.code;
-        room.serverMessage = `${room.players.get(peer.id).name} joined. Practice lobby active.`;
-        return broadcast(room, 'player-joined');
+    room = rooms.get(peer.room);
+    if (!room) return writeJson(response, 409, { ok: false, id: peer.id, message: 'You are not in a room.' });
+    const isHost = room.hostId === peer.id;
+
+    if (message.type === 'input') setInput(room, peer.id, message);
+    else if (message.type === 'configure' && isHost) { configureRoom(room, message.settings || {}); broadcast(room, 'configured'); }
+    else if (message.type === 'fill_bots' && isHost) { fillBots(room, message.count || room.settings.maxPlayers); broadcast(room, 'bots-filled'); }
+    else if (message.type === 'remove_bots' && isHost) { removeBots(room); broadcast(room, 'bots-removed'); }
+    else if (message.type === 'quick_launch' && isHost) { quickStartRoom(room); broadcast(room, 'quick-launch'); }
+    else if (message.type === 'start' && isHost) { startRoom(room); broadcast(room, 'countdown'); }
+    else if (message.type === 'ready') { setPlayerReady(room, peer.id, message.ready); broadcast(room, 'ready'); }
+    else if (message.type === 'role') { setPlayerRole(room, peer.id, message.role); broadcast(room, 'role'); }
+    else if (message.type === 'team') { setPlayerTeam(room, peer.id, message.team); broadcast(room, 'team'); }
+    else if (message.type === 'links' && isHost && Array.isArray(message.links)) { room.links = message.links.slice(0, 8); broadcast(room, 'links'); }
+    else if (message.type === 'upgrade' && isHost && room.phase === 'upgrade') { chooseUpgrade(room, Number(message.index)); broadcast(room, 'upgrade'); }
+    else if (message.type === 'leave') { detachPeer(peer, true); return writeJson(response, 200, { ok: true, id: peer.id }); }
+    else if (!['input'].includes(message.type)) return writeJson(response, 403, { ok: false, id: peer.id, message: isHost ? 'Unknown command.' : 'Host-only command or unknown command.' });
+
+    return writeJson(response, 200, { ok: true, id: peer.id, state: stateForPeer(peer) });
+  }
+
+  const server = createServer(async (request, response) => {
+    try {
+      const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
+      if (request.method === 'GET' && url.pathname === '/api/health') return writeJson(response, 200, { ok: true, transport: 'sse-http', dependencyFree: true, version: VERSION, rooms: rooms.size, peers: peers.size, maxPlayers: 8, presets: Object.keys(PRESETS) });
+      if (request.method === 'GET' && url.pathname === '/api/session') {
+        const peer = getPeer(url.searchParams.get('id'));
+        return writeJson(response, 200, { ok: true, id: peer.id, version: VERSION, transport: 'sse-http' });
       }
-
-      const room = rooms.get(peer.room);
-      if (!room) return;
-      const isHost = room.hostId === peer.id;
-
-      if (message.type === 'input') return setInput(room, peer.id, message);
-      if (message.type === 'configure' && isHost) { configureRoom(room, message.settings || {}); return broadcast(room, 'configured'); }
-      if (message.type === 'fill_bots' && isHost) { fillBots(room, message.count || room.settings.maxPlayers); return broadcast(room, 'bots-filled'); }
-      if (message.type === 'remove_bots' && isHost) { removeBots(room); return broadcast(room, 'bots-removed'); }
-      if (message.type === 'quick_launch' && isHost) { quickStartRoom(room); return broadcast(room, 'quick-launch'); }
-      if (message.type === 'start' && isHost) { startRoom(room); return broadcast(room, 'countdown'); }
-      if (message.type === 'ready') { setPlayerReady(room, peer.id, message.ready); return broadcast(room, 'ready'); }
-      if (message.type === 'role') { setPlayerRole(room, peer.id, message.role); return broadcast(room, 'role'); }
-      if (message.type === 'team') { setPlayerTeam(room, peer.id, message.team); return broadcast(room, 'team'); }
-      if (message.type === 'links' && isHost && Array.isArray(message.links)) { room.links = message.links.slice(0, 8); return broadcast(room, 'links'); }
-      if (message.type === 'upgrade' && isHost && room.phase === 'upgrade') { chooseUpgrade(room, Number(message.index)); return broadcast(room, 'upgrade'); }
-    });
-
-    ws.on('close', () => {
-      const room = rooms.get(peer.room);
-      if (room) {
-        room.players.delete(peer.id);
-        if (!room.players.size || [...room.players.values()].every(p => p.bot)) rooms.delete(room.code);
-        else {
-          if (room.hostId === peer.id) room.hostId = [...room.players.keys()].find(id => !room.players.get(id)?.bot) || room.players.keys().next().value;
-          room.serverMessage = 'A player disconnected. Hosting remains active.';
-          broadcast(room, 'disconnect');
-        }
+      if (request.method === 'GET' && url.pathname === '/api/links') return writeJson(response, 200, { links: linkBases(request, port), publicLink: false, message: 'Dependency-free build: share a detected LAN link with players on the same network.' });
+      if (request.method === 'POST' && url.pathname === '/api/public') return writeJson(response, 200, { ok: true, links: linkBases(request, port), publicLink: false, message: 'Dependency-free build: no tunnel dependency. Share the LAN link with players on the same network.' });
+      if (request.method === 'GET' && url.pathname === '/api/state') {
+        const peer = getPeer(url.searchParams.get('id'));
+        return writeJson(response, 200, { ok: true, id: peer.id, state: stateForPeer(peer) });
       }
-      peers.delete(peer.id);
-    });
+      if (request.method === 'POST' && url.pathname === '/api/command') return handleCommand(request, response);
+      if (request.method === 'GET' && url.pathname === '/api/events') {
+        const peer = getPeer(url.searchParams.get('id'));
+        peer.request = request;
+        peer.response = response;
+        response.writeHead(200, {
+          'content-type': 'text/event-stream; charset=utf-8',
+          'cache-control': 'no-store, no-transform',
+          connection: 'keep-alive',
+          'x-accel-buffering': 'no'
+        });
+        sse(peer, { type: 'hello', id: peer.id, version: VERSION });
+        const state = stateForPeer(peer);
+        if (state) sse(peer, { type: 'state', reason: 'connected', state });
+        request.on('close', () => detachPeer(peer, false));
+        return;
+      }
+      return serveStatic(request, response);
+    } catch (error) {
+      response.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+      response.end(String(error?.stack || error));
+    }
   });
 
   const timer = setInterval(() => {
