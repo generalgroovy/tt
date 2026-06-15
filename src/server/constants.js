@@ -1,4 +1,4 @@
-export const VERSION = '2.6.0-zero-dependency-host';
+export const VERSION = '2.6.1-public-link-alpha';
 export const ARENA = Object.freeze({ width: 1600, height: 900, midX: 800 });
 export const TICK_HZ = 30;
 export const MAX_PLAYERS = 8;
