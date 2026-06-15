@@ -2,7 +2,31 @@
 
 Self-hostable paddle-raid roguelike built from the original `tt` prototype. This version is focused on plug-and-play fun and gradual skill development: press **Instant Run + Bots**, optionally keep Guided Tutorial enabled for co-op or competitive starts, get a mission contract, start the countdown, and play immediately.
 
-## Run
+## Executable launch
+
+Windows:
+
+```text
+Double-click RelayRift.cmd
+```
+
+macOS:
+
+```bash
+chmod +x RelayRift.command
+./RelayRift.command
+```
+
+Linux:
+
+```bash
+chmod +x RelayRift
+./RelayRift
+```
+
+The launchers install dependencies if `node_modules` is missing, start the local server, and open or point you to `http://localhost:8080`.
+
+## Manual run
 
 ```bash
 npm install
@@ -55,11 +79,15 @@ The smoke test verifies HTML controls, health/version metadata, quickstart with 
 ## Structure
 
 ```text
+RelayRift.cmd             Windows executable launcher
+RelayRift.command         macOS command launcher
+RelayRift                 Linux/Unix command launcher
 server.js                 app entrypoint
 src/server/app.js         HTTP, static serving, WebSocket rooms
 src/server/game.js        server-authoritative simulation
 src/server/constants.js   version, presets, roles, upgrades
 src/server/missions.js    super-alpha contract mission system
+src/server/tutorial.js    optional guided tutorial ladder
 public/index.html         UI shell
 public/css/styles.css     responsive arcade/HUD styling
 public/js/main.js         client networking, UI, renderer, practice mode
