@@ -1,6 +1,6 @@
-# Relay Rift Alpha
+# Relay Rift Super-Duper Alpha
 
-Self-hostable paddle-raid roguelike, now promoted from beta-style prototype to alpha-style playable foundation.
+Self-hostable paddle-raid roguelike built from the original `tt` prototype. This version is focused on plug-and-play fun and gradual skill development: press **Instant Run + Bots**, optionally keep Guided Tutorial enabled for co-op or competitive starts, get a mission contract, start the countdown, and play immediately.
 
 ## Run
 
@@ -11,44 +11,38 @@ npm start
 
 Open `http://localhost:8080`.
 
-## Alpha improvements
+## Super-alpha highlights
 
-- First-run guidance explains the host/join/practice/ready/start flow.
-- Host and joined players stay in a playable practice lobby until launch.
-- Players can mark themselves **Ready**; ready count is visible to the room.
-- Host launch now uses a visible countdown instead of an abrupt transition.
-- Lobby configuration resets ready state so nobody is accidentally carried into a changed run.
-- Versus team balancing is fixed when switching between co-op and versus.
-- Runtime pacing is gentler: lower opening ball speed and server-side speed cap reduce chaos spikes.
-- Client visual quality setting: High, Medium, Low/Laptop.
-- Diagnostics panel shows last event, shots, blocks, misses, best combo, and current quality preset.
-- Health endpoint reports alpha version and room capacity.
+- **Instant Run + Bots**: no waiting for friends, no setup friction.
+- **Optional Guided Tutorial in every mode**: Academy teaches by default; co-op and Mirror Duel can start with the same lesson overlay enabled or disabled.
+- **Contract missions**: each preset gives a clear objective and reward.
+- **Expanded presets**: First Run, Quick Raid, Mirror Duel 4v4, Chaos Lab, Rift Sprint, Boss Rush.
+- **Bot pilots**: bots fill lanes, serve, spin, dash, cover mirrored teams, and use roles.
+- **10 roles**: Guard, Striker, Runner, Vector, Anchor, Chaos, Medic, Engineer, Phantom, Warden.
+- **Active skill layer**: Shift dash now has Focus Burst synergy that can influence nearby balls.
+- **Boss cores**: Boss Rush and every fifth level can spawn elite core blocks.
+- **Mission telemetry**: current mission, mission progress, last event, shots, cores, blocks, misses, dashes, focus bursts, bot saves.
+- **Plug-and-play host flow**: fill bots, remove bots, quick launch, normal countdown, invite links, and public link option.
 
-## Core experience
+## Controls
 
-- Single-player practice is always available before hosting or joining.
-- Visible hosting state: online badge, room code, invite links, player count, host label, and status feed.
-- Up to 8 players per room.
-- Co-op raid supports 1-8 players against escalating rooms.
-- Mirror Versus supports 1v1 through 4v4 with symmetric left/right lane placement around the arena midpoint.
-- Six roles: Guard, Striker, Runner, Vector, Anchor, Chaos.
-- Server-authoritative multiplayer simulation with smoother client rendering/interpolation.
-- Richer mechanics: energy, shields, combo, rally economy, spin authority, portals, midpoint net, heal/split/charge/heavy blocks, extra balls, pierce, magnet, tempo, boss-bane, vampire rally, and drill damage.
-- Level clear offers 5 readable upgrade choices.
+- Mouse / touch: paddle position
+- W/S or Arrow Up/Down: vertical movement
+- A/D or Arrow Left/Right: spin direction
+- Space / click: serve
+- Shift: dash / focus burst when charged
 
-## Host and join
+## Presets
 
-1. Enter callsign and role.
-2. Choose Co-op Raid or Mirror Versus.
-3. Press **Host Room**.
-4. Share the visible invite link.
-5. Friends open the link and auto-join the practice lobby.
-6. Players practice locally and press **Ready**.
-7. Host configures difficulty, target level, mode, and player cap.
-8. Host presses **Launch Multiplayer Run**.
-9. Countdown starts; synchronized run begins after countdown.
-
-Same-Wi-Fi friends use the LAN link shown in the app. Internet friends can try **Make Public Link**, which uses the optional `localtunnel` dependency from inside the app.
+| Preset | Use |
+|---|---|
+| Academy Path | structured lesson ladder from serve to team play |
+| First Run | gentle guided run with bots |
+| Quick Raid | default co-op plug-and-play run |
+| Mirror Duel 4v4 | symmetric competitive 4v4 with bots |
+| Chaos Lab | volatile blocks, surge hazards, high intensity |
+| Rift Sprint | short score attack with mission pressure |
+| Boss Rush | elite cores, higher difficulty, co-op pressure |
 
 ## Test
 
@@ -56,17 +50,18 @@ Same-Wi-Fi friends use the LAN link shown in the app. Internet friends can try *
 npm test
 ```
 
-The smoke test checks HTTP serving, versioned health, WebSocket room creation, 8-player join, mirrored 4-vs-4 team balance, ready state, readiness reset after host config, countdown launch, multiplayer transition, and 5-card upgrade draft generation.
+The smoke test verifies HTML controls, health/version metadata, quickstart with bots, optional co-op/versus tutorial toggling, mission contracts, bot fill/remove, 8-player mirrored teams, preset reconfiguration, countdown launch, and 5-card upgrade drafts.
 
 ## Structure
 
 ```text
 server.js                 app entrypoint
 src/server/app.js         HTTP, static serving, WebSocket rooms
-src/server/game.js        server-authoritative game simulation
-src/server/constants.js   roles, arena constants, upgrade definitions
+src/server/game.js        server-authoritative simulation
+src/server/constants.js   version, presets, roles, upgrades
+src/server/missions.js    super-alpha contract mission system
 public/index.html         UI shell
-public/css/styles.css     polished responsive styling
+public/css/styles.css     responsive arcade/HUD styling
 public/js/main.js         client networking, UI, renderer, practice mode
 scripts/smoke-test.js     integration smoke test
 ```
