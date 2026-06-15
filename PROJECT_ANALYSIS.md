@@ -1,94 +1,68 @@
-# Relay Rift Alpha Feedback Simulation and Optimization Pass
+# Relay Rift Super-Alpha Analysis
 
-This pass treats the 2.1 build as beta and simulates early external feedback. The goal is not feature sprawl; it is converting the game into an alpha that communicates state clearly, survives common lobby confusion, feels less abrupt, and gives players useful feedback.
+This pass remakes the alpha into a plug-and-play super-alpha. The main design problem was that the game was becoming mechanically deep but still depended on lobby coordination. Super-alpha changes the default path: the player can launch instantly with bots, understand a mission objective, and get readable feedback while the multiplayer system remains available.
 
-## Simulated feedback
+## Structural changes
 
-### New player
+- Added `src/server/missions.js` to isolate contract mission logic from the core simulation.
+- Kept `src/server/game.js` authoritative but expanded it with mission hooks, boss cores, focus burst, and richer run statistics.
+- Kept `src/server/app.js` as the room/socket boundary and extended it with quickstart and bot lifecycle messages.
+- Kept the client in one browser runtime file for GitHub-copy simplicity, while server logic is modular.
 
-- “I do not know what to do first.”
-- “I joined but I am not sure whether I am waiting or playing.”
-- “The role names sound interesting, but I need stronger status feedback.”
+## Mechanics added or improved
 
-Implemented response:
+- Contract missions tied to presets.
+- Mission progress and mission rewards.
+- Rift Sprint and Boss Rush presets.
+- Phantom and Warden roles.
+- Focus Burst: Shift dash can influence nearby balls when upgraded or when using Phantom.
+- Boss core blocks that damage the enemy when cracked.
+- Core Scanner, Mission Payout, Focus Burst, Afterimage Guard, and other new upgrade hooks.
+- More visible run diagnostics.
 
-- Added first-run onboarding text.
-- Kept practice playable in lobby.
-- Added visible ready strip and clearer lobby status wording.
+## Fun-loop changes
 
-### Host
+Old loop:
 
-- “Hosting works, but I need stronger proof that the room is actually active.”
-- “Starting the run is too sudden.”
-- “When I change settings, old ready states should not remain valid.”
+1. Host room.
+2. Wait for players.
+3. Configure.
+4. Start.
+5. Learn by trial.
 
-Implemented response:
+Super-alpha loop:
 
-- Retained visible host state, room code, links, roster, and status feed.
-- Added ready state and ready counts.
-- Added countdown phase before multiplayer starts.
-- Host configuration now resets readiness.
+1. Press Instant Run.
+2. Bots fill the game.
+3. Mission appears.
+4. Countdown starts.
+5. Play immediately.
+6. Invite friends later or host a full mirrored room.
 
-### Competitive players
+## Current risks
 
-- “Switching from co-op to versus should not leave everyone stacked on one side.”
-- “I need to audit team balance quickly.”
+- Bots are useful but not yet personality-rich.
+- Boss cores are systemic, not authored boss encounters.
+- Missions are simple counters, not multi-stage scripted tutorials.
+- Audio and gamepad support are still missing.
+- Reconnect tokens are still missing.
 
-Implemented response:
+## Recommended next pass
 
-- Versus configuration now redistributes teams left/right in alternating order.
-- Ready strip and roster make state easier to audit.
+1. Add audio feedback and camera shake levels.
+2. Add deterministic seeded daily runs.
+3. Add authored bosses with telegraphed attacks.
+4. Add gamepad support and rebinding.
+5. Add reconnect tokens and spectator mode.
+6. Split client into UI, renderer, network, and practice modules once the feature loop stabilizes.
 
-### Co-op players
+## 2.5.1 Optional tutorial implementation
 
-- “Opening pace can get chaotic too quickly.”
-- “We need a way to understand why a run failed.”
+Players no longer have to start in Academy/single-player practice to receive guidance. The room now has a `tutorialEnabled` setting:
 
-Implemented response:
-
-- Reduced opening ball speed.
-- Added server-side speed cap.
-- Added diagnostics: last event, shots, block hits, misses, best combo.
-
-### Performance-constrained laptop
-
-- “Glow and grid can be expensive.”
-
-Implemented response:
-
-- Added visual quality selector: High, Medium, Low/Laptop.
-- Low quality disables expensive shadows and grid rendering.
-
-## Implemented alpha changes
-
-- Versioned as `2.2.0-alpha`.
-- Health endpoint reports version.
-- Lobby ready state.
-- Launch countdown phase.
-- Readiness reset on host config changes.
-- Team redistribution when switching to versus.
-- Gentler ball launch and speed cap.
-- Run statistics and last-event telemetry.
-- Client diagnostics panel.
-- Client visual quality preset.
-- Stronger smoke test covering readiness and countdown.
-
-## Remaining alpha risks
-
-- The game still lacks deterministic seeded runs.
-- There is no reconnect token yet.
-- There is no audio pass yet.
-- There is no real tutorial mission sequence yet.
-- Client interpolation is simple and not full prediction/reconciliation.
-- Bosses are still systemic hazards rather than authored encounters.
-
-## Next recommended pass
-
-1. Add a tutorial ladder: serve, spin, save, split, portal, co-op role drill.
-2. Add deterministic seeds and daily run.
-3. Add reconnect tokens.
-4. Add gamepad support.
-5. Add authored boss encounters.
-6. Add sound design and camera feedback.
-7. Add player ping/latency and server tick diagnostics.
-8. Add post-run summary overlay with MVP callouts.
+- Academy and First Run keep tutorial enabled by default.
+- Co-op and Mirror Duel expose a Guided Tutorial checkbox on the home screen and in host controls.
+- Hosts can turn the tutorial on or off before launch.
+- When enabled, co-op/versus uses the same serve → spin → dash → blocks → mission → draft → team ladder.
+- When disabled, the room enters free play with tutorial cards and coach overlay hidden.
+- The smoke test verifies both free-play Mirror Duel and opt-in guided Boss Rush.
