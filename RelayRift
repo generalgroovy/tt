@@ -5,6 +5,4 @@ if ! command -v node >/dev/null 2>&1; then
   printf '%s\n' 'Install Node.js LTS from: https://nodejs.org/'
   exit 1
 fi
-[ -d node_modules ] || npm install
-printf '%s\n' 'Relay Rift starting on http://localhost:8080'
-npm start
+node launcher.mjs
