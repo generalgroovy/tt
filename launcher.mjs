@@ -7,6 +7,7 @@ const URL = `http://localhost:${PORT}`;
 const HEALTH = `http://127.0.0.1:${PORT}/api/health`;
 const isWindows = process.platform === 'win32';
 const npmCommand = isWindows ? 'npm.cmd' : 'npm';
+const REQUIRED_PACKAGES = ['ws'];
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -29,6 +30,23 @@ function openBrowser(url) {
   child.unref();
 }
 
+function missingPackages() {
+  return REQUIRED_PACKAGES.filter(name => !existsSync(`node_modules/${name}/package.json`));
+}
+
+async function ensureDependencies() {
+  const missing = missingPackages();
+  if (!existsSync('node_modules') || missing.length) {
+    if (missing.length) console.log(`Missing dependency package(s): ${missing.join(', ')}`);
+    console.log('Installing dependencies with npm install...');
+    await run(npmCommand, ['install']);
+  }
+  const stillMissing = missingPackages();
+  if (stillMissing.length) {
+    throw new Error(`Dependency installation did not provide: ${stillMissing.join(', ')}. Delete node_modules and package-lock.json, then run npm install manually.`);
+  }
+}
+
 async function waitForServer(timeoutMs = 25000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -46,32 +64,39 @@ async function waitForServer(timeoutMs = 25000) {
 console.log('Relay Rift launcher');
 console.log(`Working directory: ${process.cwd()}`);
 
-if (!existsSync('node_modules')) {
-  console.log('node_modules missing; installing dependencies first...');
-  await run(npmCommand, ['install']);
+try {
+  await ensureDependencies();
+} catch (error) {
+  console.error('Dependency setup failed.');
+  console.error(error?.message || error);
+  process.exit(1);
 }
 
 console.log(`Starting Relay Rift server on ${URL} ...`);
 const server = spawn(process.execPath, ['server.js'], { stdio: 'inherit', shell: false });
 let exited = false;
+let exitCode = null;
 server.on('exit', code => {
   exited = true;
-  console.log(`Relay Rift server exited with code ${code ?? 0}.`);
-  process.exit(code ?? 0);
+  exitCode = code ?? 0;
 });
 server.on('error', error => {
   exited = true;
+  exitCode = 1;
   console.error('Failed to start Relay Rift server:', error);
-  process.exit(1);
 });
 
 const ready = await waitForServer();
 if (ready) {
   console.log(`Relay Rift is ready: ${URL}`);
   openBrowser(URL);
-} else if (!exited) {
+} else if (exited) {
+  console.error(`Relay Rift server exited with code ${exitCode}.`);
+  console.error('If the log above mentions a missing package, run npm install or delete node_modules and run RelayRift.cmd again.');
+  process.exit(exitCode || 1);
+} else {
   console.error(`Server did not respond at ${HEALTH}.`);
-  console.error('Leave this window open and check the server log above. If the port is already in use, close the old server window and run again.');
+  console.error('If port 8080 is already in use, close the old server window and run again.');
 }
 
 process.on('SIGINT', () => {
@@ -83,4 +108,7 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-await new Promise(() => {});
+await new Promise(resolve => {
+  server.on('exit', code => resolve(code));
+});
+process.exit(exitCode || 0);
