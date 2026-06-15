@@ -94,7 +94,12 @@ if (PUBLIC_MODE) {
   try {
     const tunnel = await startTunnel();
     tunnelProcess = tunnel.child;
-    await registerPublicUrl(tunnel.url);
+    try {
+      await registerPublicUrl(tunnel.url);
+    } catch (registrationError) {
+      console.warn('Public URL registration in local UI failed; opening the public link directly.');
+      console.warn(registrationError?.message || registrationError);
+    }
     openUrl = tunnel.url;
     console.log('PUBLIC JOIN LINK:');
     console.log(tunnel.url);
