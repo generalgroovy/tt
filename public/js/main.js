@@ -1,274 +1,67 @@
 const $ = id => document.getElementById(id);
 const ui = {
-  canvas: $('game'), badge: $('connectionBadge'), home: $('homePanel'), room: $('roomPanel'), name: $('nameInput'), mode: $('modeInput'), max: $('maxInput'), role: $('roleInput'), difficulty: $('difficultyInput'), target: $('targetInput'),
-  host: $('hostButton'), roomInput: $('roomInput'), join: $('joinButton'), notice: $('notice'), hostStatus: $('hostStatus'), roomCode: $('roomCodeButton'), roomMessage: $('roomMessage'), invite: $('inviteInput'),
-  copyInvite: $('copyInviteButton'), share: $('shareButton'), public: $('publicButton'), refresh: $('refreshLinksButton'), allLinks: $('allLinks'), hostControls: $('hostControls'),
-  lobbyMode: $('lobbyModeInput'), lobbyMax: $('lobbyMaxInput'), lobbyDifficulty: $('lobbyDifficultyInput'), lobbyTarget: $('lobbyTargetInput'), start: $('startButton'), waiting: $('waitingMessage'), lobbyRole: $('lobbyRoleInput'),
-  left: $('leftButton'), right: $('rightButton'), leave: $('leaveButton'), playerList: $('playerList'), upgrades: $('upgradePanel'), bottomBar: $('bottomBar')
+  c: $('game'), badge: $('connectionBadge'), home: $('homePanel'), room: $('roomPanel'), name: $('nameInput'), preset: $('presetInput'), tutorial: $('tutorialInput'), mode: $('modeInput'), max: $('maxInput'), role: $('roleInput'), diff: $('difficultyInput'), quick: $('quickStartButton'), host: $('hostButton'), roomIn: $('roomInput'), join: $('joinButton'), notice: $('notice'), hostStatus: $('hostStatus'), roomCode: $('roomCodeButton'), msg: $('roomMessage'), tip: $('directorTip'), mission: $('missionStatus'), skill: $('skillStatus'), readyStrip: $('readyStrip'), invite: $('inviteInput'), copy: $('copyInviteButton'), share: $('shareButton'), pub: $('publicButton'), refresh: $('refreshLinksButton'), all: $('allLinks'), hostBox: $('hostControls'), lpreset: $('lobbyPresetInput'), lmode: $('lobbyModeInput'), lmax: $('lobbyMaxInput'), ldiff: $('lobbyDifficultyInput'), ltutorial: $('lobbyTutorialInput'), fillBots: $('fillBotsButton'), removeBots: $('removeBotsButton'), quickLaunch: $('quickLaunchButton'), start: $('startButton'), waiting: $('waitingMessage'), lrole: $('lobbyRoleInput'), ready: $('readyButton'), left: $('leftButton'), right: $('rightButton'), quality: $('qualityInput'), leave: $('leaveButton'), diag: $('diagnostics'), players: $('playerList'), ups: $('upgradePanel'), bottom: $('bottomBar')
 };
-const ctx = ui.canvas.getContext('2d');
-const params = new URLSearchParams(location.search);
-let width = 0, height = 0, dpr = 1, ws = null, connected = false, myId = '', state = null, autoJoined = false;
-let previousState = null, previousAt = 0, currentAt = 0;
+const ctx = ui.c.getContext('2d');
+let w = 0, h = 0, dpr = 1, ws, myId = '', state, previous, previousAt = 0, currentAt = 0, connected = false, quality = localStorage.relayQuality || 'medium';
+const query = new URLSearchParams(location.search);
 const input = { y: 0.5, dy: 0, spin: 0, serve: false, ability: false };
 const keys = new Set();
-const practice = { player: { x: 72, y: 450, h: 118 }, enemy: { x: 1528, y: 450, h: 128 }, balls: [], blocks: [], hp: 5, enemyHp: 10, score: 0 };
 const palette = { cyan: '#80f7ff', pink: '#ff5f7e', gold: '#ffd166', green: '#80ff9a', purple: '#a98cff', text: '#f5f7ff', muted: '#aab5d8' };
-const defaultRoles = { guard: { label: 'Guard', trait: 'stable defense' }, striker: { label: 'Striker', trait: 'damage' }, runner: { label: 'Runner', trait: 'speed' }, vector: { label: 'Vector', trait: 'spin' }, anchor: { label: 'Anchor', trait: 'shield' }, chaos: { label: 'Chaos', trait: 'volatility' } };
-
-function resize() {
-  width = innerWidth;
-  height = innerHeight;
-  dpr = Math.min(devicePixelRatio || 1, 2);
-  ui.canvas.width = Math.floor(width * dpr);
-  ui.canvas.height = Math.floor(height * dpr);
-  ui.canvas.style.width = `${width}px`;
-  ui.canvas.style.height = `${height}px`;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-addEventListener('resize', resize);
-resize();
-
-function sx(x) { return x / 1600 * width; }
-function sy(y) { return y / 900 * height; }
-function setBadge(text, online = false) { ui.badge.textContent = text; ui.badge.className = `badge ${online ? 'online' : 'offline'}`; }
-function clean(value) { return String(value).replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+const fallbackRoles = { guard: { label: 'Guard', trait: 'defense' }, striker: { label: 'Striker', trait: 'damage' }, runner: { label: 'Runner', trait: 'speed' }, vector: { label: 'Vector', trait: 'spin' }, anchor: { label: 'Anchor', trait: 'shield' }, chaos: { label: 'Chaos', trait: 'volatility' }, medic: { label: 'Medic', trait: 'healing' }, engineer: { label: 'Engineer', trait: 'field control' }, phantom: { label: 'Phantom', trait: 'dash' }, warden: { label: 'Warden', trait: 'boss control' } };
+function resize() { w = innerWidth; h = innerHeight; dpr = Math.min(devicePixelRatio || 1, 2); ui.c.width = Math.floor(w * dpr); ui.c.height = Math.floor(h * dpr); ui.c.style.width = w + 'px'; ui.c.style.height = h + 'px'; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+addEventListener('resize', resize); resize();
+function sx(x) { return x / 1600 * w; } function sy(y) { return y / 900 * h; }
+function esc(v) { return String(v ?? '').replace(/[&<>\"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function setBadge(text, ok = false) { ui.badge.textContent = text; ui.badge.className = 'badge ' + (ok ? 'online' : 'offline'); }
 function playerName() { const n = ui.name.value.trim() || localStorage.relayName || 'Player'; localStorage.relayName = n; return n; }
-function send(message) { if (ws?.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(message)); return true; } status('Still connecting.'); return false; }
-function status(text) { ui.roomMessage.textContent = text; }
-async function copy(text) { try { await navigator.clipboard.writeText(text); status('Copied.'); } catch { status('Clipboard blocked; select and copy manually.'); } }
-function fillRoleSelects(roles = defaultRoles) {
-  const html = Object.entries(roles).map(([key, value]) => `<option value="${key}">${clean(value.label || key)} — ${clean(value.trait || '')}</option>`).join('');
-  ui.role.innerHTML = html;
-  ui.lobbyRole.innerHTML = html;
-}
-fillRoleSelects();
-
+function send(payload) { if (ws?.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(payload)); return true; } if (ui.msg) ui.msg.textContent = 'Still connecting.'; return false; }
+function fillRoles(roles = fallbackRoles) { const html = Object.entries(roles).map(([k, r]) => `<option value="${k}">${esc(r.label || k)} — ${esc(r.trait || '')}</option>`).join(''); ui.role.innerHTML = html; ui.lrole.innerHTML = html; }
+fillRoles(); ui.name.value = localStorage.relayName || ''; ui.quality.value = quality;
 function connect() {
   setBadge('connecting');
-  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
-  ws.addEventListener('open', () => {
-    connected = true;
-    ui.host.disabled = false;
-    ui.join.disabled = false;
-    setBadge('online', true);
-    if (params.get('room') && !autoJoined) {
-      autoJoined = true;
-      ui.roomInput.value = params.get('room').toUpperCase();
-      ui.notice.textContent = 'Invite detected. Auto-joining practice lobby...';
-      setTimeout(() => send({ type: 'join', room: ui.roomInput.value, name: playerName(), role: ui.role.value }), 350);
-    }
-  });
-  ws.addEventListener('close', () => {
-    connected = false;
-    ui.host.disabled = true;
-    ui.join.disabled = true;
-    setBadge('reconnecting');
-    setTimeout(connect, 900);
-  });
-  ws.addEventListener('message', event => {
-    const message = JSON.parse(event.data);
-    if (message.type === 'hello') myId = message.id;
-    if (message.type === 'error') status(message.message);
-    if (message.type === 'state') {
-      previousState = state;
-      previousAt = currentAt || performance.now();
-      currentAt = performance.now();
-      state = message.state;
-      fillRoleSelects(state.roles);
-      renderUi(message.reason);
-    }
-  });
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host + '/ws');
+  ws.onopen = () => { connected = true; ui.host.disabled = ui.join.disabled = ui.quick.disabled = false; setBadge('online', true); const r = query.get('room'); if (r) { ui.roomIn.value = r.toUpperCase(); setTimeout(() => send({ type: 'join', room: ui.roomIn.value, name: playerName(), role: ui.role.value }), 300); } };
+  ws.onclose = () => { connected = false; ui.host.disabled = ui.join.disabled = ui.quick.disabled = true; setBadge('reconnecting'); setTimeout(connect, 900); };
+  ws.onmessage = event => { const msg = JSON.parse(event.data); if (msg.type === 'hello') myId = msg.id; if (msg.type === 'error') ui.msg.textContent = msg.message; if (msg.type === 'state') { previous = state; previousAt = currentAt || performance.now(); currentAt = performance.now(); state = msg.state; fillRoles(state.roles); renderUi(msg.reason); } };
 }
-
+function roomPayload() { return { name: playerName(), preset: ui.preset.value, tutorialEnabled: ui.tutorial.checked, mode: ui.mode.value, maxPlayers: Number(ui.max.value), difficulty: Number(ui.diff.value), role: ui.role.value }; }
+function configure() { send({ type: 'configure', settings: { preset: ui.lpreset.value, mode: ui.lmode.value, maxPlayers: Number(ui.lmax.value), difficulty: Number(ui.ldiff.value), tutorialEnabled: ui.ltutorial.checked } }); }
 function renderUi(reason = 'state') {
-  const inRoom = !!state?.room;
-  ui.home.classList.toggle('hidden', inRoom);
-  ui.room.classList.toggle('hidden', !inRoom);
-  if (!inRoom) return;
-  const isHost = state.hostId === myId;
-  ui.hostStatus.textContent = isHost ? 'You are hosting' : 'Connected to host';
-  ui.hostStatus.style.color = isHost ? palette.green : palette.cyan;
-  ui.roomCode.textContent = state.room;
-  status(`${state.serverMessage} · ${state.players.length}/${state.settings.maxPlayers} players · ${state.phase === 'lobby' ? 'Practice lobby' : state.phase} · ${reason}`);
+  const inRoom = !!state?.room; ui.home.classList.toggle('hidden', inRoom); ui.room.classList.toggle('hidden', !inRoom); if (!inRoom) return;
+  const isHost = state.hostId === myId; const me = state.players.find(p => p.id === myId);
+  ui.hostStatus.textContent = isHost ? 'You are hosting' : 'Connected to host'; ui.hostStatus.style.color = isHost ? palette.green : palette.cyan;
+  ui.roomCode.textContent = state.room; ui.msg.textContent = `${state.serverMessage} · ${state.players.length}/${state.settings.maxPlayers} players · ${reason}`;
+  ui.tip.textContent = 'Coach: ' + (state.director?.tip || 'Protect HP and play the mission.');
+  ui.mission.innerHTML = `<b>${esc(state.mission?.title || 'Mission')}</b><br>${esc(state.mission?.objective || '')}<br>${esc(state.director?.mission || '')}`;
+  ui.skill.innerHTML = `<b>${esc(state.skill?.title || 'Skill')}</b><br>${esc(state.skill?.focus || '')}<br>${esc(state.skill?.goal || '')}<br>${esc(state.skill?.summary || '')}`;
+  ui.skill.classList.toggle('hidden', state.skill?.enabled === false);
+  ui.readyStrip.textContent = `Ready ${state.ready?.count || 0}/${state.ready?.total || state.players.length} · ${state.phase}${state.countdown ? ' · launch in ' + state.countdown : ''}`;
   ui.invite.value = state.invites?.[0] || `${location.origin}/?room=${state.room}`;
-  ui.allLinks.innerHTML = (state.invites || []).map(link => `<button type="button">${clean(link)}</button>`).join('');
-  ui.allLinks.querySelectorAll('button').forEach(button => button.onclick = () => copy(button.textContent));
-  ui.hostControls.classList.toggle('hidden', !isHost || state.phase !== 'lobby');
-  ui.waiting.classList.toggle('hidden', isHost || state.phase !== 'lobby');
-  if (isHost) {
-    ui.lobbyMode.value = state.settings.mode;
-    ui.lobbyMax.value = String(state.settings.maxPlayers);
-    ui.lobbyDifficulty.value = String(state.settings.difficulty);
-    ui.lobbyTarget.value = String(state.settings.targetLevel);
-  }
-  const me = state.players.find(p => p.id === myId);
-  if (me) ui.lobbyRole.value = me.role;
-  ui.left.disabled = state.phase !== 'lobby' || state.settings.mode !== 'versus';
-  ui.right.disabled = state.phase !== 'lobby' || state.settings.mode !== 'versus';
-  ui.playerList.innerHTML = state.players.map(p => `<div class="player"><div><b>${clean(p.name)}${p.id === myId ? ' (you)' : ''}${p.id === state.hostId ? ' · host' : ''}</b><br><small>${clean(p.team)} · ${clean(p.role)} · ${Math.round((p.energy || 0) * 100)}% energy</small><div class="energy"><span style="width:${Math.round((p.energy || 0) * 100)}%"></span></div></div><span>${p.team === 'left' ? '◀' : '▶'}</span></div>`).join('');
-  const showUpgrades = isHost && state.phase === 'upgrade';
-  ui.upgrades.classList.toggle('hidden', !showUpgrades);
-  ui.upgrades.innerHTML = showUpgrades ? `<p class="kicker">Choose one of five</p>${state.upgrades.map((u, i) => `<button data-index="${i}"><span>${clean(u.group)}</span><b>${clean(u.name)}</b>${clean(u.desc)}</button>`).join('')}` : '';
-  ui.bottomBar.textContent = state.phase === 'lobby' ? 'Practice lobby active · host configures while everyone plays locally' : 'Multiplayer sync active · build combo, protect HP, clear levels';
+  ui.all.innerHTML = (state.invites || []).map(link => `<button type="button">${esc(link)}</button>`).join(''); ui.all.querySelectorAll('button').forEach(b => b.onclick = () => copy(b.textContent));
+  ui.hostBox.classList.toggle('hidden', !isHost || state.phase !== 'lobby'); ui.waiting.classList.toggle('hidden', isHost || state.phase !== 'lobby');
+  if (isHost) { ui.lpreset.value = state.settings.preset || 'quickRaid'; ui.lmode.value = state.settings.mode; ui.lmax.value = String(state.settings.maxPlayers); ui.ldiff.value = String(state.settings.difficulty); ui.ltutorial.checked = !!state.settings.tutorialEnabled; }
+  if (me) { ui.lrole.value = me.role; ui.ready.textContent = me.ready ? 'Ready ✓' : 'Ready'; ui.ready.classList.toggle('armed', !!me.ready); }
+  ui.left.disabled = ui.right.disabled = state.phase !== 'lobby' || state.settings.mode !== 'versus';
+  ui.players.innerHTML = state.players.map(p => `<div class="player ${p.bot ? 'bot' : ''}"><div><b>${esc(p.name)}${p.id === myId ? ' (you)' : ''}${p.id === state.hostId ? ' · host' : ''}${p.bot ? ' · bot' : ''}</b><br><small>${esc(p.team)} · ${esc(p.role)} · ${Math.round((p.energy || 0) * 100)}% energy${p.ready ? ' · ready' : ''}</small><div class="energy"><span style="width:${Math.round((p.energy || 0) * 100)}%"></span></div></div><span>${p.team === 'left' ? '◀' : '▶'}</span></div>`).join('');
+  const stats = state.runStats || {}; ui.diag.innerHTML = `<b>Last:</b> ${esc(state.lastEvent || '')}<br><b>Shots:</b> ${stats.shots || 0} · <b>Blocks:</b> ${stats.blocks || 0} · <b>Cores:</b> ${stats.cores || 0} · <b>Misses:</b> ${stats.misses || 0}<br><b>Dashes:</b> ${stats.dashes || 0} · <b>Focus:</b> ${stats.focusBursts || 0} · <b>Mission:</b> ${stats.missionCompletions || 0} · <b>Best combo:</b> ${stats.bestCombo || 0}<br><b>Tutorial:</b> ${state.skill?.enabled === false ? 'off' : 'on'} · <b>Quality:</b> ${quality}`;
+  const showUpgrades = isHost && state.phase === 'upgrade'; ui.ups.classList.toggle('hidden', !showUpgrades); ui.ups.innerHTML = showUpgrades ? `<p class="kicker">Choose one of five</p>${state.upgrades.map((u, i) => `<button data-index="${i}"><span>${esc(u.group)}</span><b>${esc(u.name)}</b>${esc(u.desc)}</button>`).join('')}` : '';
+  ui.bottom.textContent = state.phase === 'lobby' ? 'Lobby: fill bots, invite friends, or quick launch.' : state.phase === 'countdown' ? `Launch in ${state.countdown}` : state.skill?.enabled === false ? 'Free play: mission first, upgrades after clears.' : `${state.skill?.title || 'Skill'} · ${state.skill?.summary || ''}`;
 }
-
-function configureLobby() { send({ type: 'configure', settings: { mode: ui.lobbyMode.value, maxPlayers: Number(ui.lobbyMax.value), difficulty: Number(ui.lobbyDifficulty.value), targetLevel: Number(ui.lobbyTarget.value) } }); }
-ui.name.value = localStorage.relayName || '';
-ui.host.onclick = () => { if (send({ type: 'create', name: playerName(), mode: ui.mode.value, maxPlayers: Number(ui.max.value), difficulty: Number(ui.difficulty.value), targetLevel: Number(ui.target.value), role: ui.role.value })) { ui.notice.textContent = 'Host request sent. Waiting for visible lobby confirmation...'; setBadge('hosting...', true); } };
-ui.join.onclick = () => send({ type: 'join', name: playerName(), room: ui.roomInput.value.toUpperCase().trim(), role: ui.role.value });
-ui.roomCode.onclick = () => copy(state?.room || '');
-ui.copyInvite.onclick = () => copy(ui.invite.value);
-ui.share.onclick = () => navigator.share ? navigator.share({ title: 'Join Relay Rift', url: ui.invite.value }) : copy(ui.invite.value);
-ui.refresh.onclick = async () => { const data = await fetch('/api/links').then(r => r.json()); send({ type: 'links', links: data.links }); };
-ui.public.onclick = async () => { status('Creating public link...'); const data = await fetch('/api/public', { method: 'POST' }).then(r => r.json()); status(data.message); if (data.links) send({ type: 'links', links: data.links }); };
-[ui.lobbyMode, ui.lobbyMax, ui.lobbyDifficulty, ui.lobbyTarget].forEach(control => control.onchange = configureLobby);
-ui.start.onclick = () => send({ type: 'start' });
-ui.lobbyRole.onchange = () => send({ type: 'role', role: ui.lobbyRole.value });
-ui.left.onclick = () => send({ type: 'team', team: 'left' });
-ui.right.onclick = () => send({ type: 'team', team: 'right' });
-ui.leave.onclick = () => { location.href = location.pathname; };
-ui.upgrades.onclick = event => { const button = event.target.closest('button[data-index]'); if (button) send({ type: 'upgrade', index: Number(button.dataset.index) }); };
-
-ui.canvas.addEventListener('pointermove', event => { input.y = event.clientY / Math.max(1, height); });
-ui.canvas.addEventListener('pointerdown', event => { input.y = event.clientY / Math.max(1, height); input.serve = true; });
-addEventListener('keydown', event => { keys.add(event.key.toLowerCase()); if (event.code === 'Space') input.serve = true; if (event.shiftKey) input.ability = true; });
-addEventListener('keyup', event => keys.delete(event.key.toLowerCase()));
-setInterval(() => {
-  input.dy = (keys.has('w') || keys.has('arrowup') ? -1 : 0) + (keys.has('s') || keys.has('arrowdown') ? 1 : 0);
-  input.spin = (keys.has('a') || keys.has('arrowleft') ? -1 : 0) + (keys.has('d') || keys.has('arrowright') ? 1 : 0);
-  if (state?.phase === 'playing') send({ type: 'input', ...input });
-  input.serve = false;
-  input.ability = false;
-}, 33);
-
-function initPractice() {
-  practice.blocks = Array.from({ length: 28 }, () => ({ x: 320 + Math.random() * 960, y: 80 + Math.random() * 740, type: Math.random() < 0.16 ? 'heal' : Math.random() < 0.28 ? 'split' : 'brick' }));
-  practice.balls = [{ x: 125, y: 450, vx: 0, vy: 0, radius: 10, held: true, spin: 0 }];
-}
-initPractice();
-
-function updatePractice(dt) {
-  practice.player.y += ((input.y * 900) - practice.player.y) * 0.32 + input.dy * 450 * dt;
-  practice.player.y = Math.max(60, Math.min(840, practice.player.y));
-  for (const ball of practice.balls) {
-    if (ball.held) {
-      ball.x = practice.player.x + 34;
-      ball.y = practice.player.y;
-      if (input.serve) { ball.held = false; ball.vx = 610; ball.vy = input.spin * 220; ball.spin = input.spin; }
-      continue;
-    }
-    ball.vy += ball.spin * 260 * dt;
-    ball.x += ball.vx * dt;
-    ball.y += ball.vy * dt;
-    ball.spin *= 0.995;
-    if (ball.y < 30 || ball.y > 870) { ball.y = Math.max(30, Math.min(870, ball.y)); ball.vy *= -1; }
-    practice.enemy.y += (ball.y - practice.enemy.y) * 0.055;
-    if (ball.vx < 0 && Math.abs(ball.x - practice.player.x) < 26 && Math.abs(ball.y - practice.player.y) < practice.player.h / 2 + 10) { ball.x = practice.player.x + 30; ball.vx = Math.abs(ball.vx); ball.vy += (ball.y - practice.player.y) * 5 + input.spin * 180; ball.spin += input.spin; practice.score += 10; }
-    if (ball.vx > 0 && Math.abs(ball.x - practice.enemy.x) < 26 && Math.abs(ball.y - practice.enemy.y) < practice.enemy.h / 2 + 10) { ball.x = practice.enemy.x - 30; ball.vx = -Math.abs(ball.vx); ball.vy += (ball.y - practice.enemy.y) * 4; }
-    for (let i = practice.blocks.length - 1; i >= 0; i -= 1) {
-      const block = practice.blocks[i];
-      if (Math.abs(ball.x - block.x) < 25 && Math.abs(ball.y - block.y) < 25) {
-        practice.blocks.splice(i, 1);
-        ball.vx *= -1;
-        practice.score += 18;
-        if (block.type === 'heal') practice.hp = Math.min(8, practice.hp + 1);
-        if (block.type === 'split' && practice.balls.length < 3) practice.balls.push({ ...ball, vx: -ball.vx, vy: -ball.vy });
-      }
-    }
-    if (ball.x > 1590) { practice.enemyHp -= 1; ball.held = true; }
-    if (ball.x < 10) { practice.hp -= 1; ball.held = true; }
-  }
-  if (practice.blocks.length < 4 || practice.hp <= 0 || practice.enemyHp <= 0) { practice.hp = 5; practice.enemyHp = 10; initPractice(); }
-}
-
-function lerp(a, b, t) { return a + (b - a) * t; }
-function interpolatedState() {
-  if (!state || !previousState || previousState.room !== state.room) return state;
-  const span = Math.max(16, currentAt - previousAt);
-  const t = Math.max(0, Math.min(1, (performance.now() - currentAt) / span + 0.18));
-  return {
-    ...state,
-    players: state.players.map(p => {
-      const old = previousState.players?.find(x => x.id === p.id);
-      return old ? { ...p, x: lerp(old.x, p.x, t), y: lerp(old.y, p.y, t) } : p;
-    }),
-    balls: state.balls.map((b, i) => {
-      const old = previousState.balls?.[i];
-      return old ? { ...b, x: lerp(old.x, b.x, t), y: lerp(old.y, b.y, t) } : b;
-    })
-  };
-}
-
-function drawArenaBase() {
-  const grd = ctx.createRadialGradient(width / 2, height * 0.35, 20, width / 2, height / 2, Math.max(width, height));
-  grd.addColorStop(0, '#17224d');
-  grd.addColorStop(0.55, '#070c1d');
-  grd.addColorStop(1, '#03040b');
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = 'rgba(128,247,255,.08)';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < width; x += 72) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke(); }
-  for (let y = 0; y < height; y += 72) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
-  ctx.strokeStyle = 'rgba(255,209,102,.40)';
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(width / 2, 0); ctx.lineTo(width / 2, height); ctx.stroke();
-}
-function text(label, y, size = 24) { ctx.fillStyle = 'rgba(245,247,255,.93)'; ctx.font = `950 ${size}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(label, width / 2, y); }
-function drawPractice() {
-  for (const block of practice.blocks) drawBlock(block);
-  drawPaddle(practice.player.x, practice.player.y, practice.player.h, palette.cyan, 'YOU', 'left');
-  drawPaddle(practice.enemy.x, practice.enemy.y, practice.enemy.h, palette.pink, 'SIM', 'right');
-  for (const ball of practice.balls) drawBall(ball);
-  ctx.fillStyle = palette.muted; ctx.font = '800 12px system-ui'; ctx.textAlign = 'center'; ctx.fillText(`solo practice · score ${practice.score} · HP ${practice.hp} · click/space to serve`, width / 2, height - 22);
-}
-function drawNetworkGame(s) {
-  ctx.fillStyle = palette.text; ctx.font = '950 15px system-ui'; ctx.textAlign = 'center'; ctx.fillText(`MULTIPLAYER · L ${s.level} · HP ${s.hp}/${s.maxHp} · SHIELD ${s.shields} · ENEMY ${s.enemyHp} · COMBO ${s.combo}`, width / 2, 28);
-  for (const hazard of s.hazards || []) drawHazard(hazard);
-  for (const block of s.blocks || []) drawBlock(block);
-  for (const player of s.players || []) drawPaddle(player.x, player.y, player.height, player.team === 'left' ? palette.cyan : palette.pink, `${player.name} · ${player.role}`, player.team, player.energy);
-  for (const ball of s.balls || []) drawBall({ x: ball.x, y: ball.y, radius: ball.radius, spin: ball.spin });
-  if (s.phase === 'upgrade') text(s.hostId === myId ? 'Choose one of five upgrades' : 'Host choosing one of five upgrades', height / 2, 24);
-}
-function drawPaddle(x, y, h, color, label, side, energy = 0) {
-  ctx.save(); ctx.shadowColor = color; ctx.shadowBlur = 20; ctx.fillStyle = color; ctx.fillRect(sx(x - 9), sy(y - h / 2), sx(18), sy(h)); ctx.restore();
-  ctx.fillStyle = 'white'; ctx.font = '800 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText(label, sx(x), sy(y - h / 2 - 10));
-  ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fillRect(sx(x - 18), sy(y + h / 2 + 7), sx(36), 4);
-  ctx.fillStyle = palette.gold; ctx.fillRect(sx(x - 18), sy(y + h / 2 + 7), sx(36 * energy), 4);
-}
-function drawBall(ball) {
-  const x = sx(ball.x), y = sy(ball.y), r = Math.max(5, sx(ball.radius || 10));
-  ctx.save(); ctx.shadowColor = 'white'; ctx.shadowBlur = 18; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-  if (Math.abs(ball.spin || 0) > 0.25) { ctx.strokeStyle = (ball.spin > 0 ? palette.gold : palette.purple); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r + 7, 0, Math.PI * 1.4); ctx.stroke(); }
-}
-function drawBlock(block) {
-  ctx.fillStyle = block.type === 'heal' ? palette.green : block.type === 'split' ? palette.gold : block.type === 'charge' ? palette.cyan : block.type === 'heavy' ? palette.pink : palette.purple;
-  ctx.fillRect(sx(block.x - 12), sy(block.y - 12), sx(24), sy(24));
-}
-function drawHazard(hazard) {
-  ctx.save(); ctx.strokeStyle = hazard.type === 'portal' ? palette.gold : palette.cyan; ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 15; ctx.lineWidth = 3;
-  if (hazard.type === 'portal') { ctx.beginPath(); ctx.arc(sx(hazard.x), sy(hazard.y), sx(hazard.radius), 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.arc(sx(hazard.x2), sy(hazard.y2), sx(hazard.radius), 0, Math.PI * 2); ctx.stroke(); }
-  if (hazard.type === 'net') { ctx.beginPath(); ctx.moveTo(sx(hazard.x), sy(hazard.y - hazard.height / 2)); ctx.lineTo(sx(hazard.x), sy(hazard.y + hazard.height / 2)); ctx.stroke(); }
-  ctx.restore();
-}
-
-let lastFrame = performance.now();
-function frame() {
-  requestAnimationFrame(frame);
-  const now = performance.now();
-  const dt = Math.min(0.05, (now - lastFrame) / 1000);
-  lastFrame = now;
-  drawArenaBase();
-  const s = interpolatedState();
-  if (!s || s.phase === 'lobby') {
-    updatePractice(dt);
-    drawPractice();
-    text(s ? `PRACTICE LOBBY · ${s.players.length}/${s.settings.maxPlayers} · ROOM ${s.room}` : (connected ? 'SOLO PRACTICE · HOST OR JOIN' : 'CONNECTING'), 34, 18);
-    text(s?.hostId === myId ? 'You are hosting. Configure, share, launch.' : s ? 'Waiting for host. Practice locally.' : 'Start the server, then host or join.', height / 2 - 100, 20);
-  } else {
-    drawNetworkGame(s);
-  }
-}
-connect();
-frame();
+async function copy(text) { try { await navigator.clipboard.writeText(text); ui.msg.textContent = 'Copied.'; } catch { ui.msg.textContent = 'Clipboard blocked; copy manually.'; } }
+ui.quick.onclick = () => send({ type: 'quickstart', ...roomPayload() }); ui.host.onclick = () => send({ type: 'create', ...roomPayload() }); ui.join.onclick = () => send({ type: 'join', name: playerName(), room: ui.roomIn.value.toUpperCase().trim(), role: ui.role.value });
+ui.copy.onclick = () => copy(ui.invite.value); ui.share.onclick = () => navigator.share ? navigator.share({ title: 'Join Relay Rift', url: ui.invite.value }) : copy(ui.invite.value); ui.roomCode.onclick = () => copy(state?.room || '');
+ui.refresh.onclick = async () => { const d = await fetch('/api/links').then(r => r.json()); send({ type: 'links', links: d.links }); }; ui.pub.onclick = async () => { ui.msg.textContent = 'Creating public link...'; const d = await fetch('/api/public', { method: 'POST' }).then(r => r.json()); ui.msg.textContent = d.message; if (d.links) send({ type: 'links', links: d.links }); };
+[ui.lpreset, ui.lmode, ui.lmax, ui.ldiff, ui.ltutorial].forEach(el => el.onchange = configure); ui.fillBots.onclick = () => send({ type: 'fill_bots' }); ui.removeBots.onclick = () => send({ type: 'remove_bots' }); ui.quickLaunch.onclick = () => send({ type: 'quick_launch' }); ui.start.onclick = () => send({ type: 'start' }); ui.ready.onclick = () => { const me = state?.players?.find(p => p.id === myId); send({ type: 'ready', ready: !me?.ready }); };
+ui.lrole.onchange = () => send({ type: 'role', role: ui.lrole.value }); ui.left.onclick = () => send({ type: 'team', team: 'left' }); ui.right.onclick = () => send({ type: 'team', team: 'right' }); ui.quality.onchange = () => { quality = ui.quality.value; localStorage.relayQuality = quality; }; ui.leave.onclick = () => location.href = location.pathname; ui.ups.onclick = e => { const b = e.target.closest('button[data-index]'); if (b) send({ type: 'upgrade', index: Number(b.dataset.index) }); };
+ui.c.onpointermove = e => { input.y = e.clientY / Math.max(1, h); }; ui.c.onpointerdown = e => { input.y = e.clientY / Math.max(1, h); input.serve = true; };
+addEventListener('keydown', e => { keys.add(e.key.toLowerCase()); if (e.code === 'Space') input.serve = true; if (e.shiftKey) input.ability = true; }); addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+setInterval(() => { input.dy = (keys.has('w') || keys.has('arrowup') ? -1 : 0) + (keys.has('s') || keys.has('arrowdown') ? 1 : 0); input.spin = (keys.has('a') || keys.has('arrowleft') ? -1 : 0) + (keys.has('d') || keys.has('arrowright') ? 1 : 0); if (state?.phase === 'playing' || state?.phase === 'countdown') send({ type: 'input', ...input }); input.serve = false; input.ability = false; }, 33);
+function interp() { if (!state || !previous || previous.room !== state.room) return state; const span = Math.max(16, currentAt - previousAt); const t = Math.max(0, Math.min(1, (performance.now() - currentAt) / span + 0.18)); const lerp = (a, b) => a + (b - a) * t; return { ...state, players: state.players.map(p => { const o = previous.players?.find(x => x.id === p.id); return o ? { ...p, x: lerp(o.x, p.x), y: lerp(o.y, p.y) } : p; }), balls: state.balls.map((b, i) => { const o = previous.balls?.[i]; return o ? { ...b, x: lerp(o.x, b.x), y: lerp(o.y, b.y) } : b; }) }; }
+function drawBg() { const g = ctx.createRadialGradient(w / 2, h * .35, 20, w / 2, h / 2, Math.max(w, h)); g.addColorStop(0, '#17265a'); g.addColorStop(.55, '#070c1d'); g.addColorStop(1, '#03040b'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); if (quality !== 'low') { ctx.strokeStyle = 'rgba(128,247,255,.07)'; for (let x = 0; x < w; x += quality === 'high' ? 72 : 100) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); } for (let y = 0; y < h; y += quality === 'high' ? 72 : 100) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); } } ctx.strokeStyle = 'rgba(255,209,102,.45)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h); ctx.stroke(); }
+function blockColor(type) { return type === 'heal' ? palette.green : type === 'split' ? palette.gold : type === 'charge' ? palette.cyan : type === 'heavy' ? palette.pink : type === 'core' ? '#fff' : type === 'volatile' ? '#ff9f1c' : palette.purple; }
+function drawPaddle(p) { ctx.save(); ctx.shadowColor = p.team === 'left' ? palette.cyan : palette.pink; ctx.shadowBlur = quality === 'low' ? 0 : 18; ctx.fillStyle = ctx.shadowColor; ctx.fillRect(sx(p.x - 9), sy(p.y - p.height / 2), sx(18), sy(p.height)); ctx.restore(); ctx.fillStyle = 'white'; ctx.font = '800 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText((p.bot ? 'BOT ' : '') + p.name, sx(p.x), sy(p.y - p.height / 2 - 10)); ctx.fillStyle = 'rgba(255,255,255,.16)'; ctx.fillRect(sx(p.x - 18), sy(p.y + p.height / 2 + 7), sx(36), 4); ctx.fillStyle = palette.gold; ctx.fillRect(sx(p.x - 18), sy(p.y + p.height / 2 + 7), sx(36 * (p.energy || 0)), 4); }
+function drawBall(b) { const x = sx(b.x), y = sy(b.y), r = Math.max(5, sx(b.radius || 10)); ctx.save(); ctx.shadowColor = 'white'; ctx.shadowBlur = quality === 'low' ? 0 : 18; ctx.fillStyle = 'white'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.restore(); if (Math.abs(b.spin || 0) > .25) { ctx.strokeStyle = b.spin > 0 ? palette.gold : palette.purple; ctx.beginPath(); ctx.arc(x, y, r + 7, 0, Math.PI * 1.4); ctx.stroke(); } }
+function drawText(text, y, size = 20) { ctx.fillStyle = palette.text; ctx.font = `950 ${size}px system-ui`; ctx.textAlign = 'center'; ctx.fillText(text, w / 2, y); }
+function draw() { requestAnimationFrame(draw); drawBg(); const s = interp(); if (!s) { drawText(connected ? 'HOST, JOIN, OR INSTANT RUN' : 'CONNECTING', 44, 20); return; } (s.hazards || []).forEach(z => { ctx.strokeStyle = z.type === 'surge' ? palette.pink : z.type === 'portal' ? palette.gold : palette.cyan; ctx.lineWidth = 3; ctx.beginPath(); if (z.type === 'net') { ctx.moveTo(sx(z.x), sy(z.y - z.height / 2)); ctx.lineTo(sx(z.x), sy(z.y + z.height / 2)); } else ctx.arc(sx(z.x), sy(z.y), sx(z.radius || 34), 0, 7); ctx.stroke(); }); (s.blocks || []).forEach(b => { ctx.fillStyle = blockColor(b.type); ctx.fillRect(sx(b.x - 12), sy(b.y - 12), sx(24), sy(24)); }); (s.players || []).forEach(drawPaddle); (s.balls || []).forEach(drawBall); drawText(`${s.phase.toUpperCase()} · L${s.level} · HP ${s.hp}/${s.maxHp} · SCORE ${s.score} · COMBO ${s.combo}`, 28, 15); if (s.phase === 'countdown') drawText(`Launch in ${s.countdown}`, h / 2, 44); else if (s.phase === 'lobby') drawText(s.skill?.enabled === false ? 'FREE PLAY LOBBY' : (s.skill?.title || 'ACADEMY'), h / 2 - 90, 24); else if (s.skill?.showCoach) drawText(s.skill?.tip || s.director?.tip || '', h - 40, 14); }
+connect(); draw();
