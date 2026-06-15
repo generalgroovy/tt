@@ -8,12 +8,8 @@ const HEALTH = `http://127.0.0.1:${PORT}/api/health`;
 function openBrowser(url) {
   const command = process.platform === 'win32' ? 'cmd' : process.platform === 'darwin' ? 'open' : 'xdg-open';
   const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
-  try {
-    const child = spawn(command, args, { detached: true, stdio: 'ignore', shell: false });
-    child.unref();
-  } catch {
-    // Browser auto-open is best effort. The URL is printed below.
-  }
+  const child = spawn(command, args, { detached: true, stdio: 'ignore', shell: false });
+  child.unref();
 }
 
 async function waitForServer(timeoutMs = 25000) {
@@ -23,14 +19,14 @@ async function waitForServer(timeoutMs = 25000) {
       const response = await fetch(HEALTH, { cache: 'no-store' });
       if (response.ok) return true;
     } catch {}
-    await delay(350);
+    await delay(300);
   }
   return false;
 }
 
-console.log('Relay Rift zero-dependency launcher');
+console.log('Relay Rift launcher');
 console.log(`Working directory: ${process.cwd()}`);
-console.log('No npm install is required. Runtime uses only built-in Node.js modules.');
+console.log('Starting server with built-in Node modules only.');
 console.log(`Starting Relay Rift server on ${URL} ...`);
 
 const server = spawn(process.execPath, ['server.js'], { stdio: 'inherit', shell: false });
@@ -42,13 +38,14 @@ server.on('error', error => { exited = true; exitCode = 1; console.error('Failed
 const ready = await waitForServer();
 if (ready) {
   console.log(`Relay Rift is ready: ${URL}`);
-  console.log('Host runs once. Other players join by opening the invite/LAN link shown in the game.');
   openBrowser(URL);
 } else if (exited) {
   console.error(`Relay Rift server exited with code ${exitCode}.`);
+  console.error('If port 8080 is already in use, close the old server window and run again.');
   process.exit(exitCode || 1);
 } else {
-  console.error(`Server did not respond at ${HEALTH}. If port 8080 is already in use, close the old server window and run again.`);
+  console.error(`Server did not respond at ${HEALTH}.`);
+  console.error('If port 8080 is already in use, close the old server window and run again.');
 }
 
 process.on('SIGINT', () => { if (!server.killed) server.kill('SIGINT'); process.exit(0); });
