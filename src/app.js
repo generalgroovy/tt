@@ -31,6 +31,7 @@ function titleCheckboxHit(x, y) {
   return game.mode === 'title' && x >= game.W / 2 - 130 && x <= game.W / 2 + 130 && y >= game.H * 0.62 + 68 && y <= game.H * 0.62 + 102;
 }
 function clickAt(x, y) {
+  if (game.mode === 'playing' && game.paused) { game.paused = false; game.syncButton(); return; }
   if (titleCheckboxHit(x, y)) { game.toggleSkipIntro(); renderer.draw(); return; }
   if (['title', 'gameover', 'victory'].includes(game.mode)) { game.newRun(); return; }
   if (game.launchFreeServe()) return;
@@ -61,7 +62,11 @@ function loop(now) {
   }
   requestAnimationFrame(loop);
 }
-button.addEventListener('click', () => game.newRun());
+button.addEventListener('click', () => {
+  if (game.mode === 'playing' && game.paused) { game.paused = false; game.syncButton(); }
+  else game.newRun();
+  canvas.focus();
+});
 canvas.addEventListener('pointerdown', event => { const p = updatePointer(event, true); clickAt(p.x, p.y); canvas.focus(); event.preventDefault(); });
 canvas.addEventListener('pointermove', event => { updatePointer(event); event.preventDefault(); });
 canvas.addEventListener('pointerleave', event => { if (event.pointerType !== 'mouse') game.pointer.active = false; });
@@ -69,19 +74,20 @@ canvas.addEventListener('touchmove', event => event.preventDefault(), { passive:
 window.addEventListener('keydown', event => {
   game.keys.add(event.code);
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
+  if (event.repeat) return;
   if (event.code === 'Space') {
     if (['title', 'gameover', 'victory'].includes(game.mode)) game.newRun();
     else if (game.launchFreeServe()) return;
     else if (game.mode === 'playing' && !game.balls.length) game.serve(1);
   }
   if (event.code === 'KeyR') game.newRun();
-  if (event.code === 'KeyP' && game.mode === 'playing') game.paused = !game.paused;
+  if (event.code === 'KeyP' && game.mode === 'playing') { game.paused = !game.paused; game.syncButton(); }
   if (event.code === 'KeyL' && game.player) { game.player.angleLocked = !game.player.angleLocked; game.player.manualAngle = game.player.angle; }
   if (event.code === 'KeyX' && game.player) game.player.angleLocked = false;
   if (game.mode === 'upgrade' && ['Digit1','Digit2','Digit3','Numpad1','Numpad2','Numpad3'].includes(event.code)) game.chooseRelic(Number(event.code.replace('Digit','').replace('Numpad','')) - 1);
 });
 window.addEventListener('keyup', event => game.keys.delete(event.code));
-window.addEventListener('blur', () => { game.keys.clear(); if (game.mode === 'playing') game.paused = true; });
+window.addEventListener('blur', () => { game.keys.clear(); if (game.mode === 'playing') { game.paused = true; game.syncButton(); } });
 window.addEventListener('resize', () => game.resize());
 window.addEventListener('orientationchange', () => game.resize());
 
