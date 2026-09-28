@@ -9,6 +9,25 @@
 <body>
   <canvas id="game" tabindex="0" aria-label="that's a paddlin game canvas"></canvas>
   <button id="actionButton" type="button">Start game</button>
+  <aside id="gameTools" aria-label="Game tools">
+    <button id="practiceButton" type="button">Practice</button>
+    <details id="infoPanel"><summary>Info</summary><p>Move the paddle with your pointer or finger. Angle sets the bounce direction; spin curves the ball. Tap the controls below or use A / D to angle and charge spin, X for automatic angle. Space serves; P pauses.</p><p>Practice has unlimited health and does not save a score. Choose Start game when ready.</p><label><input id="skipIntro" type="checkbox"> Skip calibration levels in normal games</label></details>
+  </aside>
+  <section id="paddleControls" aria-label="Paddle controls" hidden>
+    <p id="practiceStatus" role="status" hidden></p>
+    <div class="control-row" aria-label="Paddle angle">
+      <button id="angleLeft" type="button" aria-label="Tilt paddle counterclockwise">↶</button>
+      <button id="angleAuto" type="button" aria-pressed="true">Auto angle</button>
+      <button id="angleRight" type="button" aria-label="Tilt paddle clockwise">↷</button>
+      <button id="serveButton" type="button">Serve</button>
+    </div>
+    <div class="control-row" aria-label="Spin direction">
+      <button data-spin="-1" type="button" aria-pressed="false">Backspin</button>
+      <button data-spin="0" type="button" aria-pressed="true">No spin</button>
+      <button data-spin="1" type="button" aria-pressed="false">Topspin</button>
+      <button id="pauseControl" type="button">Pause</button>
+    </div>
+  </section>
   <script type="module" src="src/main.js"></script>
   <script type="module" src="src/playability-hotfix.js"></script>
   <script type="module" src="src/shippable-polish.js"></script>

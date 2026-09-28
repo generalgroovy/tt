@@ -36,3 +36,20 @@ html, body {
   box-shadow: 0 0 24px rgba(128,247,255,.34);
 }
 #actionButton[hidden] { display: none; }
+
+[hidden] { display: none !important; }
+#game { top: 52px; }
+#gameTools { position: fixed; z-index: 4; right: 12px; top: 8px; display: flex; align-items: start; gap: 8px; }
+#gameTools button, #gameTools summary, #paddleControls button { font: inherit; min-height: 44px; border: 1px solid #576a86; border-radius: 9px; background: #132335; color: #f5f7ff; padding: 8px 10px; cursor: pointer; }
+#gameTools summary { list-style: none; }
+#infoPanel { position: relative; }
+#infoPanel[open] { width: min(310px,calc(100vw - 24px)); padding: 8px; background: #132335; border: 1px solid #80f7ff; border-radius: 10px; }
+#infoPanel p { font-size: 14px; line-height: 1.5; }
+#paddleControls { position: fixed; bottom: 0; left: 0; right: 0; z-index: 3; min-height: 172px; padding: 6px max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)); background: #080f20; display: grid; align-content: end; gap: 6px; }
+.control-row { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 6px; max-width: 620px; width: 100%; margin: 0 auto; }
+#paddleControls button[aria-pressed="true"] { border-color: #80f7ff; background: #194957; }
+#paddleControls button:disabled { opacity: .45; cursor: default; }
+#practiceStatus { margin: 0 auto 4px; max-width: 620px; font-size: 14px; min-height: 36px; }
+#actionButton { bottom: 188px; }
+:focus-visible { outline: 3px solid #f9dc77; outline-offset: 2px; }
+@media(max-width: 420px) { #paddleControls button { font-size: 13px; padding: 7px 4px; } }

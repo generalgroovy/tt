@@ -264,3 +264,14 @@ Renderer.prototype.hud = function hudMinimal() {
   g.notes.slice(-3).forEach((n, i) => { ctx.globalAlpha = clamp(n.life / n.maxLife, 0, 1); ctx.fillStyle = n.color; ctx.font = i === 2 ? '900 22px sans-serif' : '900 14px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(n.text, g.W / 2, g.H / 2 - 126 - i * 22); });
   ctx.restore();
 };
+
+Renderer.prototype.title = function titleCompact() {
+  const ctx=this.ctx,g=this.game;
+  this.overlay(.72);
+  ctx.save();ctx.textAlign='center';
+  ctx.fillStyle=Colors.text;ctx.font=`900 ${clamp(g.W*.075,26,64)}px sans-serif`;
+  ctx.fillText("that's a paddlin",g.W/2,g.H*.36,g.W-36);
+  ctx.fillStyle=Colors.cyan;ctx.font='800 18px sans-serif';
+  ctx.fillText('Angle. Spin. Survive.',g.W/2,g.H*.36+38,g.W-36);
+  ctx.restore();
+};

@@ -1,4 +1,7 @@
 import './pro-overhaul.js';
+import './playability-hotfix.js';
+import './shippable-polish.js';
+import { installPracticeControls } from './practice-controls.js';
 import { Game } from './game.js';
 import { Renderer } from './render.js';
 
@@ -7,6 +10,7 @@ const button = document.getElementById('actionButton');
 const ctx = canvas.getContext('2d');
 const game = new Game(canvas, button);
 const renderer = new Renderer(game, ctx);
+const syncControls = installPracticeControls(game, canvas);
 let last = performance.now();
 
 function point(event) {
@@ -26,12 +30,8 @@ function updatePointer(event, force = false) {
   }
   return p;
 }
-function titleCheckboxHit(x, y) {
-  return game.mode === 'title' && x >= game.W / 2 - 130 && x <= game.W / 2 + 130 && y >= game.H * 0.62 + 68 && y <= game.H * 0.62 + 102;
-}
 function clickAt(x, y) {
   if (game.mode === 'playing' && game.paused) { game.paused = false; game.syncButton(); return; }
-  if (titleCheckboxHit(x, y)) { game.toggleSkipIntro(); renderer.draw(); return; }
   if (['title', 'gameover', 'victory'].includes(game.mode)) { game.newRun(); return; }
   if (game.launchFreeServe()) return;
   if (game.mode !== 'upgrade') return;
@@ -50,7 +50,7 @@ function clickAt(x, y) {
 function loop(now) {
   const dt = Math.min(0.024, (now - last) / 1000 || 0);
   last = now;
-  try { game.update(dt); renderer.draw(); }
+  try { game.update(dt); syncControls(); renderer.draw(); }
   catch (err) {
     console.error(err);
     game.err = err.message || 'Unknown error';
@@ -71,7 +71,7 @@ canvas.addEventListener('pointermove', event => { updatePointer(event); event.pr
 canvas.addEventListener('pointerleave', event => { if (event.pointerType !== 'mouse') game.pointer.active = false; });
 canvas.addEventListener('touchmove', event => event.preventDefault(), { passive: false });
 window.addEventListener('keydown', event => {
-  if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.target?.isContentEditable || event.target?.closest?.('input,textarea,select,button,a[href]')) return;
+  if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.target?.isContentEditable || event.target?.closest?.('input,textarea,select,button,summary,a[href]')) return;
   game.keys.add(event.code);
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
   if (event.repeat) return;
