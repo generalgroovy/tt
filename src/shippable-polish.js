@@ -244,12 +244,22 @@ Renderer.prototype.hud = function hudMinimal() {
   ctx.fillStyle = Colors.pink; ctx.fillRect(x + 18 + (w - 36) * 0.52, y + 28, (w - 36) * 0.48 * clamp(g.enemy.hp / g.enemy.maxHp, 0, 1), 7);
   const b = g.balls[0]; ctx.fillStyle = Colors.muted; ctx.font = '800 9px sans-serif';
   ctx.fillText('spin ' + (b ? b.spin.toFixed(2) : '0') + ' · load ' + Math.round(Math.abs(g.spinIntent) * 100) + '% · stamina ' + Math.round(g.enemy.stamina * 100) + '%', g.W / 2, y + 49);
-  if (g.freeServe && !g.bossEnemyServeBall) { ctx.fillStyle = Colors.cyan; ctx.font = '900 15px sans-serif'; ctx.fillText('aim spin · serve', g.W / 2, g.H / 2 - 72); }
+  if (g.freeServe && !g.bossEnemyServeBall) { ctx.fillStyle = Colors.cyan; ctx.font = '900 15px sans-serif'; ctx.fillText('Tap / click / Space to serve', g.W / 2, g.H / 2 - 72); }
   if (g.bossEnemyServeBall) { ctx.fillStyle = Colors.pink; ctx.font = '900 15px sans-serif'; ctx.fillText('receive', g.W / 2, g.H / 2 - 72); }
   if (g.dialogue) {
     const dw = Math.min(380, g.W - 36), dx = g.W - dw - 18, dy = 78, a = clamp(g.dialogue.life / g.dialogue.maxLife, 0, 1);
-    ctx.globalAlpha = clamp(a * 1.2, 0, 1); ctx.fillStyle = 'rgba(5,7,18,.84)'; ctx.beginPath(); ctx.roundRect(dx, dy, dw, 52, 13); ctx.fill();
-    ctx.fillStyle = g.dialogue.color || Colors.gold; ctx.font = '800 12px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(g.dialogue.text, dx + 12, dy + 29); ctx.globalAlpha = 1;
+    ctx.font = '800 12px sans-serif';
+    const lines = []; let line = '';
+    for (const word of g.dialogue.text.split(/\s+/)) {
+      const next = line ? line + ' ' + word : word;
+      if (line && ctx.measureText(next).width > dw - 24) { lines.push(line); line = word; }
+      else line = next;
+    }
+    if (line) lines.push(line);
+    ctx.globalAlpha = clamp(a * 1.2, 0, 1); ctx.fillStyle = 'rgba(5,7,18,.84)'; ctx.beginPath(); ctx.roundRect(dx, dy, dw, Math.max(52, lines.length * 17 + 24), 13); ctx.fill();
+    ctx.fillStyle = g.dialogue.color || Colors.gold; ctx.textAlign = 'left';
+    lines.forEach((text, i) => ctx.fillText(text, dx + 12, dy + 24 + i * 17, dw - 24));
+    ctx.globalAlpha = 1;
   }
   g.notes.slice(-3).forEach((n, i) => { ctx.globalAlpha = clamp(n.life / n.maxLife, 0, 1); ctx.fillStyle = n.color; ctx.font = i === 2 ? '900 22px sans-serif' : '900 14px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(n.text, g.W / 2, g.H / 2 - 126 - i * 22); });
   ctx.restore();

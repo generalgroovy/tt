@@ -25,3 +25,22 @@ test('pause button exposes an accessible Resume label only during paused gamepla
  sync.call(game);assert.equal(game.button.textContent,'Resume');assert.equal(game.button.hidden,false);
  game.paused=false;sync.call(game);assert.equal(game.button.hidden,true);
 });
+
+test('focused Resume keeps native Space activation; browser shortcuts do not restart a run',()=>{
+ const events={},buttonEvents={};let runs=0,prevented=0;
+ const button={addEventListener(k,f){buttonEvents[k]=f;}};
+ const canvas={addEventListener(){},focus(){}};
+ const game={mode:'playing',paused:true,keys:new Set(),newRun(){runs++;},syncButton(){},launchFreeServe(){throw new Error('Paused button must not serve');}};
+ const context=vm.createContext({game,button,canvas,window:{addEventListener(k,f){events[k]=f;}}});
+ const source=readFileSync(path.join(__dirname,'../src/main.js'),'utf8');
+ vm.runInContext(source.slice(source.indexOf("button.addEventListener('click'"),source.indexOf("window.addEventListener('resize'")),context);
+ const nativeTarget={closest(){return button;}};
+ events.keydown({code:'Space',target:nativeTarget,preventDefault(){prevented++;}});
+ assert.equal(prevented,0);assert.equal(game.keys.size,0);assert.equal(game.paused,true);
+ buttonEvents.click();assert.equal(game.paused,false);assert.equal(runs,0);
+ for(const modifier of ['ctrlKey','metaKey','altKey'])events.keydown({code:'KeyR',[modifier]:true});
+ events.keydown({code:'KeyR',target:{isContentEditable:true}});
+ events.keydown({code:'KeyR',defaultPrevented:true});
+ assert.equal(runs,0);assert.equal(game.keys.size,0);
+ events.keydown({code:'KeyR',target:canvas});assert.equal(runs,1);
+});

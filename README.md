@@ -17,7 +17,7 @@ Open `http://localhost:8080` in a modern browser. HTTP is required for JavaScrip
 | Input | Action |
 | --- | --- |
 | Mouse or touch | Position the paddle inside the left side of the arena |
-| Click or Space | Start / serve |
+| Tap, click or Space | Start / serve |
 | A/D or arrows | Rotate the paddle and load spin |
 | W/S | Adjust the face angle |
 | Shift | Rotate faster |
@@ -26,7 +26,7 @@ Open `http://localhost:8080` in a modern browser. HTTP is required for JavaScrip
 | P | Pause/resume |
 | R | Restart the run |
 
-Losing window focus pauses an active game. Resume with the **Resume** button, P, or a click on the canvas. Holding P does not repeatedly toggle pause. Pointer/touch play works for positioning and serving; advanced angle controls require a keyboard.
+Losing window focus pauses an active game. Resume with the **Resume** button, P, or a click on the canvas. Holding P does not repeatedly toggle pause. Focused buttons keep native keyboard activation; browser modifier shortcuts do not trigger game actions. Pointer/touch input handles positioning and serving; advanced angle controls require a keyboard, and physical-phone ergonomics still need playtesting.
 
 The active overhaul starts with introductory stages at level -5 and continues to level 100. Older base-class comments or renderer text can describe the earlier 50-level game; the loaded overhaul defines the active progression.
 
@@ -42,7 +42,7 @@ Use a Node.js version with the built-in test runner:
 node --test tests/*.test.cjs
 ```
 
-Tests cover pause/button behavior and blocked/corrupt storage. They do not prove full level balance, collision quality, touch ergonomics or rendered performance.
+Tests cover pause/button behavior, browser shortcut guards, touch-to-serve routing, narrow dialogue layout and blocked/corrupt storage. They do not prove full level balance, collision quality, physical touch ergonomics or rendered performance.
 
 `index.html` loads `src/main.js`, then the playability and presentation patches. `src/app.js` remains a compatibility entry that imports the same bootstrap instead of duplicating handlers; it also retains its historical run-start repair patch. Do not load both entries as separate copies. The code still uses prototype patches; keep their order explicit when changing the entry point.
 

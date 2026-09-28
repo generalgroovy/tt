@@ -71,6 +71,7 @@ canvas.addEventListener('pointermove', event => { updatePointer(event); event.pr
 canvas.addEventListener('pointerleave', event => { if (event.pointerType !== 'mouse') game.pointer.active = false; });
 canvas.addEventListener('touchmove', event => event.preventDefault(), { passive: false });
 window.addEventListener('keydown', event => {
+  if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.target?.isContentEditable || event.target?.closest?.('input,textarea,select,button,a[href]')) return;
   game.keys.add(event.code);
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
   if (event.repeat) return;
