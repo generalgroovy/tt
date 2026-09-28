@@ -1,11 +1,12 @@
 import { CFG, Colors, Relics } from './config.js';
+import { readBestScore, writeSetting } from './storage.js';
 import { clamp, rand, pick, speedOf, sign, circleRect } from './utils.js';
 
 export class Game {
   constructor(canvas, button) {
     this.canvas = canvas; this.button = button; this.W = 960; this.H = 600; this.dpr = 1;
     this.keys = new Set(); this.pointer = { active:false, x:70, y:300, lastX:null, lastY:null };
-    this.mode = 'title'; this.level = 0; this.score = 0; this.best = Number(localStorage.getItem('thats-a-paddlin-best') || 0);
+    this.mode = 'title'; this.level = 0; this.score = 0; this.best = readBestScore();
     this.combo = 0; this.comboTimer = 0; this.spinIntent = 0; this.freeServe = false;
     this.player = null; this.enemy = null; this.balls = []; this.blocks = []; this.previews = [];
     this.particles = []; this.floaters = []; this.notes = []; this.draft = []; this.relics = [];
@@ -80,7 +81,7 @@ export class Game {
   floatText(x,y,text,color){this.floaters.push({x,y,text,color,life:.82,vy:-38})}
   burst(x,y,color,n){for(let i=0;i<n;i++){let a=rand(0,Math.PI*2),v=rand(35,240);this.particles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,r:rand(1.2,3.4),color,life:rand(.25,.85)})}}
   updateEffects(dt){for(let p of this.particles){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=Math.pow(.06,dt);p.vy*=Math.pow(.06,dt);p.life-=dt}this.particles=this.particles.filter(p=>p.life>0);for(let f of this.floaters){f.y+=f.vy*dt;f.life-=dt}this.floaters=this.floaters.filter(f=>f.life>0);for(let n of this.notes)n.life-=dt;this.notes=this.notes.filter(n=>n.life>0)}
-  saveBest(){if(this.score>this.best){this.best=this.score;localStorage.setItem('thats-a-paddlin-best',this.best)}}
+  saveBest(){if(this.score>this.best){this.best=this.score;writeSetting('thats-a-paddlin-best',this.best)}}
   createDraft(){let repeat=new Set(['heart','shield','luck','meteor','comet','echo']),pool=Relics.filter(r=>!this.relics.includes(r.id)||repeat.has(r.id));this.draft=[];while(this.draft.length<3&&pool.length){let r=pick(pool);if(!this.draft.includes(r))this.draft.push(r)}this.mode='upgrade';this.notify('LEVEL UP - CHOOSE UPGRADE',Colors.gold,2);this.syncButton()}
   chooseRelic(i){if(this.mode!=='upgrade'||!this.draft[i])return;let r=this.draft[i];r.apply(this.mods,this);this.relics.push(r.id);this.notify('UPGRADE: '+r.name.toUpperCase(),Colors.gold,1.4);this.level++;if(this.level>CFG.maxLevel){this.mode='victory';this.saveBest();this.syncButton();return}this.enemy=this.makeEnemy();this.balls=[];this.fillBlocks();this.mode='playing';this.prepareFreeServe();this.syncButton()}
   values(){let b=this.balls[0],p=this.player;return[['Ball',speedOf(b).toFixed(0),Colors.cyan],['Trail',b?b.trail.length+'/'+this.trailLimit(b):'0',Colors.cyan],['Level',this.level+'/'+CFG.maxLevel,Colors.gold],['Enemy',this.enemy?this.enemy.kind:'none',Colors.pink],['Spin',b?b.spin.toFixed(2):'0',b&&b.spin>=0?Colors.gold:Colors.purple],['Load',Math.round(Math.abs(this.spinIntent)*100)+'%',this.spinIntent>=0?Colors.gold:Colors.purple],['Angle',p?(p.angle*180/Math.PI).toFixed(0)+' deg':'0',Colors.cyan],['Stamina',p?Math.round(p.stamina*100)+'%':'0',p&&p.wait>0?Colors.pink:Colors.green],['Blocks',this.blocks.length+'+'+this.previews.length,Colors.text],['Balls',String(this.balls.length),Colors.text],['Ent',String(this.balls.filter(x=>x.entangled).length),Colors.green],['Shield',String(this.mods?this.mods.shield:0),Colors.text]]}

@@ -1,4 +1,5 @@
 import { CFG, Colors, Relics } from './config.js';
+import { readSetting, writeSetting } from './storage.js';
 import { Game } from './game.js';
 import { Renderer } from './render.js';
 import { clamp, rand, pick, speedOf, sign, circleRect } from './utils.js';
@@ -76,12 +77,12 @@ Object.assign(Game.prototype, {
   fieldRect(){return{x:CFG.pad,y:this.arenaTop(),w:this.W-CFG.pad*2,h:this.arenaBottom()-this.arenaTop()}},
   playerZone(){return{x1:28,x2:this.W/3,y1:this.arenaTop()+10,y2:this.arenaBottom()-10}},
   enemyZone(){return{x1:this.W*2/3,x2:this.W-28,y1:this.arenaTop()+10,y2:this.arenaBottom()-10}},
-  toggleSkipIntro(){this.skipIntro=!this.skipIntro;localStorage.setItem('tap-skip-intro',this.skipIntro?'1':'0')},
+  toggleSkipIntro(){this.skipIntro=!this.skipIntro;writeSetting('tap-skip-intro',this.skipIntro?'1':'0')},
   baseMods(){return{maxHp:5,paddleScale:1,paddleSpeed:1,ballSpeed:1,damage:1,shield:0,crit:0,spinPower:1,extraBalls:0,scoreScale:1,comboWindow:2.1,phaseSafe:false,phaseShields:0,pinholeChance:.16,splitControl:0,entanglePower:1,collapseBonus:80,portalMastery:false,gravityWell:0,bossBane:0,trailPower:1,stunBonus:0,staminaSave:0,blockKick:0,pathFork:0,centerRefund:false,wallBrake:0,repulsor:0,spinGuard:0,previewScale:1,shear:0,maxBalls:0}},
   speak(text,color=Colors.text,life=5.2){this.dialogue={text,color,life,maxLife:life}},
   makeEnemy(){const kind=this.enemyKind(),boss=kind.startsWith('boss'),p=this.progress(),intro=this.level<1,hp=boss?Math.floor(5+Math.max(0,this.level)*1.05+(this.level===100?18:0)):Math.floor(2+Math.max(0,this.level)*.45+p*9),h=(boss?78:CFG.paddle.enemyH)+Math.max(0,this.level)*(boss?.38:.16),speed=intro?360:boss?520+p*960:470+p*1060,e=this.makePaddle(this.W-54,this.H/2,boss?Colors.red:pick([Colors.purple,Colors.pink,Colors.green,Colors.gold,Colors.blue]),hp,h,speed,kind);if(boss){this.notify('BOSS: '+this.scale().law.toUpperCase(),Colors.red,1.6);this.speak(BossLines[this.level]||this.scale().text,Colors.gold,5.4)}else if(this.level===CFG.minLevel)this.speak('Follow the pointer. Angle with A/D. Load spin, then release it into the ball.',Colors.cyan,5);return e},
   enemyKind(){if(this.isBossLevel())return pick(['boss-aperture','boss-brownian','boss-lattice','boss-observer','boss-planck']);const l=this.level;if(l>82)return pick(['metric','confinement','observer','sniper','phase']);if(l>52)return pick(['seeker','confinement','observer','phase','guardian']);if(l>22)return pick(['seeker','mirror','phase','guardian']);return pick(['rookie','seeker','guardian'])},
-  newRun(){this.skipIntro=localStorage.getItem('tap-skip-intro')==='1';Object.assign(this,{mode:'playing',paused:false,level:this.startLevel(),score:0,combo:0,comboTimer:0,spinIntent:0,freeServe:true,balls:[],blocks:[],previews:[],particles:[],floaters:[],notes:[],draft:[],relics:[],mods:this.baseMods(),flash:0,shake:0,err:''});this.player=this.makePaddle(70,this.H/2,Colors.cyan,5,CFG.paddle.h,1,'player');this.pointer.active=false;this.pointer.x=this.player.x;this.pointer.y=this.player.y;this.enemy=this.makeEnemy();this.fillBlocks();this.prepareFreeServe();this.syncButton()},
+  newRun(){this.skipIntro=readSetting('tap-skip-intro')==='1';Object.assign(this,{mode:'playing',paused:false,level:this.startLevel(),score:0,combo:0,comboTimer:0,spinIntent:0,freeServe:true,balls:[],blocks:[],previews:[],particles:[],floaters:[],notes:[],draft:[],relics:[],mods:this.baseMods(),flash:0,shake:0,err:''});this.player=this.makePaddle(70,this.H/2,Colors.cyan,5,CFG.paddle.h,1,'player');this.pointer.active=false;this.pointer.x=this.player.x;this.pointer.y=this.player.y;this.enemy=this.makeEnemy();this.fillBlocks();this.prepareFreeServe();this.syncButton()},
   prepareFreeServe(){this.freeServe=true;this.balls=[];this.notify('LEVEL '+this.level+' - '+this.scale().name,Colors.cyan,1.6)},
   maxBalls(){return 4+Math.floor(this.progress()*6)+(this.mods?.maxBalls||0)},
   blockHp(type){return{shielded:4,stone:3,regen:3,gravity:3,strong:4,bosscore:10,portal:2,wormhole:2,entangler:2,observer:2,tunneler:2,colorlock:3}[type]||1},

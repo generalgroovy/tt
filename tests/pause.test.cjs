@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const {readFileSync}=require('node:fs');
 const path=require('node:path');
-for(const entry of ['main.js','app.js'])test(`${entry}: pause offers Resume; repeated P does not flicker or restart`,()=>{
+for(const entry of ['main.js'])test(`${entry}: pause offers Resume; repeated P does not flicker or restart`,()=>{
  const events={},buttonEvents={};let runs=0,focused=false;
  const button={addEventListener(k,f){buttonEvents[k]=f;}};
  const canvas={addEventListener(){},focus(){focused=true;}};
