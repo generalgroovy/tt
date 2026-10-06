@@ -1,0 +1,7 @@
+{
+  "runtime": "02d195b58f7aa3b6d4729bf3aac50c8583873aaf",
+  "ci": "https://github.com/generalgroovy/tt/actions/runs/37541534117",
+  "conclusion": "success",
+  "modelTests": 24,
+  "publicDeployment": "parent-owned; not performed by project owner"
+}
