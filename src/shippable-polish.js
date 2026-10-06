@@ -1,7 +1,8 @@
 import { Colors, CFG, Relics } from './config.js';
 import { Game } from './game.js';
 import { Renderer } from './render.js';
-import { clamp, pick, speedOf } from './utils.js';
+import { clamp, speedOf } from './utils.js';
+import { capMods, draftUpgrades } from './upgrade-model.js';
 
 CFG.boss = { defenseServeDelay: 0.85, defenseHpRatio: 0.34 };
 CFG.balanceCaps = {
@@ -9,34 +10,7 @@ CFG.balanceCaps = {
   shields: 6, extraBalls: 4, maxBalls: 5, scoreScale: 2.35
 };
 
-const simple = new Set(['wide','boots','heart','phaseguard','mass','shield','pump']);
-const mid = new Set(['echo','gyro','noether','casimir','pauli','field','after','combo']);
-const complex = new Set(['feynman','bias','bell','phase','pinhole','entangle','collapse','worm','renorm','bossbane']);
-const repeat = new Set(['heart','phaseguard','mass','pump','shield','after']);
-
 function bossLevel(g) { return typeof g.isBossLevel === 'function' && g.isBossLevel(g.level); }
-function capMods(m) {
-  m.paddleScale = clamp(m.paddleScale ?? 1, 0.72, CFG.balanceCaps.paddleScale);
-  m.ballSpeed = clamp(m.ballSpeed ?? 1, 0.75, CFG.balanceCaps.ballSpeed);
-  m.spinPower = clamp(m.spinPower ?? 1, 0.7, CFG.balanceCaps.spinPower);
-  m.damage = clamp(m.damage ?? 1, 1, CFG.balanceCaps.damage);
-  m.shield = clamp(m.shield ?? 0, 0, CFG.balanceCaps.shields);
-  m.extraBalls = clamp(m.extraBalls ?? 0, 0, CFG.balanceCaps.extraBalls);
-  m.maxBalls = clamp(m.maxBalls ?? 0, 0, CFG.balanceCaps.maxBalls);
-  m.scoreScale = clamp(m.scoreScale ?? 1, 0.85, CFG.balanceCaps.scoreScale);
-  m.crit = clamp(m.crit ?? 0, 0, 0.48);
-  m.pinholeChance = clamp(m.pinholeChance ?? 0, 0, 0.62);
-  m.entanglePower = clamp(m.entanglePower ?? 1, 0.65, 2.25);
-  m.gravityWell = clamp(m.gravityWell ?? 0, 0, 1.25);
-  return m;
-}
-function allowedRelics(level) {
-  const allowed = new Set(simple);
-  if (level >= 5) for (const id of mid) allowed.add(id);
-  if (level >= 18) for (const id of complex) allowed.add(id);
-  if (level >= 45) for (const r of Relics) allowed.add(r.id);
-  return allowed;
-}
 function clearLevel(g, label = 'LEVEL CLEAR') {
   if (g.levelClearLock) return;
   g.levelClearLock = true;
@@ -47,24 +21,12 @@ function clearLevel(g, label = 'LEVEL CLEAR') {
   g.addScore(220 + Math.max(0, g.level) * 42, g.W / 2, g.H / 2, label);
   g.notify(label, label.includes('BOSS') ? Colors.red : Colors.gold, 1.05);
   g.mode = 'cleared';
-  setTimeout(() => {
-    if (g.mode === 'cleared') {
-      g.levelClearLock = false;
-      g.createDraft();
-    }
-  }, 380);
+  g.clearDelay = .38;
 }
 
 Game.prototype.createDraft = function createDraftPolished() {
   if (this.mode === 'upgrade') return;
-  const allowed = allowedRelics(this.level);
-  let pool = Relics.filter(r => allowed.has(r.id) && (!this.relics.includes(r.id) || repeat.has(r.id)));
-  if (pool.length < 3) pool = Relics.filter(r => !this.relics.includes(r.id) || repeat.has(r.id));
-  this.draft = [];
-  while (this.draft.length < 3 && pool.length) {
-    const r = pick(pool);
-    if (!this.draft.includes(r)) this.draft.push(r);
-  }
+  this.draft = draftUpgrades(Relics, this);
   this.mode = 'upgrade';
   this.notify('CHOOSE ONE', Colors.gold, 1.15);
   this.syncButton();
@@ -79,6 +41,7 @@ Game.prototype.chooseRelic = function chooseRelicPolished(index) {
   const r = this.draft[index];
   r.apply(this.mods, this);
   capMods(this.mods);
+  this.player.hp=Math.min(this.player.hp,this.mods.maxHp);
   this.relics.push(r.id);
   this.notify(r.name.toUpperCase(), Colors.gold, 0.9);
   this.level++;
@@ -103,7 +66,6 @@ Game.prototype.chooseRelic = function chooseRelicPolished(index) {
 Game.prototype.hitEnemy = function hitEnemyPolished(damage, x, y) {
   if (this.mode !== 'playing' || !this.enemy || this.levelClearLock) return;
   let n = Math.max(1, Math.floor(damage));
-  if (bossLevel(this)) n += this.mods.bossBane || 0;
   this.enemy.hp -= n;
   this.enemy.stun = Math.max(this.enemy.stun || 0, 0.14);
   this.addScore(70 * n, x, y, '-' + n + ' HP');
@@ -133,6 +95,16 @@ Game.prototype.launchFreeServe = function launchGuarded() {
 
 const oldUpdate = Game.prototype.update;
 Game.prototype.update = function updatePolished(dt) {
+  if (this.paused) return;
+  dt = Number.isFinite(dt) ? clamp(dt, 0, .024) : 0;
+  if (this.mode === 'cleared') {
+    this.clearDelay = Math.max(0, (this.clearDelay || 0) - dt);
+    if (!this.clearDelay) {this.levelClearLock=false;this.createDraft();}
+    return;
+  }
+  if (this.mode !== 'playing') return;
+  if (!dt) return;
+  this.clock += dt;
   if (this.bossEnemyServeBall && this.enemy) {
     const held = this.bossEnemyServeBall;
     held.x = this.enemy.x - 38;
@@ -149,16 +121,8 @@ Game.prototype.update = function updatePolished(dt) {
       this.notify('BOSS SERVE', Colors.pink, 0.8);
     }
   }
-  try {
-    oldUpdate.call(this, dt);
-  } catch (err) {
-    console.error(err);
-    this.notify('FIELD STABILIZED', Colors.cyan, 0.8);
-    this.balls = [];
-    this.freeServeBall = null;
-    this.bossEnemyServeBall = null;
-    this.prepareFreeServe();
-  }
+  oldUpdate.call(this, dt);
+  for(const ball of this.balls) if(ball.wallCue) ball.wallCue.life-=dt;
 };
 
 const oldWallSpin = Game.prototype.wallSpin;
@@ -174,34 +138,12 @@ Game.prototype.wallSpin = function wallSpinClear(ball, top) {
   if (Math.sign(before.vx || ball.vx) !== Math.sign(ball.vx || before.vx)) ball.spin *= 0.72;
 };
 
-const oldPaddleHit = Game.prototype.paddleHit;
-Game.prototype.paddleHit = function paddleHitIntentional(ball, paddle, side) {
-  const before = { spin: ball.spin, last: ball.lastHit };
-  oldPaddleHit.call(this, ball, paddle, side);
-  if (!side || ball.lastHit === before.last) return;
-  if (Math.abs(this.spinIntent) > 0.18) {
-    ball.spin = clamp(ball.spin + this.spinIntent * 0.36, -CFG.ball.maxSpin, CFG.ball.maxSpin);
-    ball.vy += this.spinIntent * Math.max(60, Math.abs(ball.vx) * 0.09);
-    this.spinIntent *= 0.44;
-  }
-  if (this.mods.centerRefund && Math.abs(ball.y - paddle.y) < paddle.h * 0.16) {
-    paddle.stamina = clamp(paddle.stamina + 0.16, 0, 1);
-    this.floatText(ball.x, ball.y - 18, 'CLEAN', Colors.green);
-  }
-  if ((this.mods.pathFork || 0) && Math.abs(ball.spin) > 1 && Math.random() < this.mods.pathFork) {
-    const v = speedOf(ball) * 0.74;
-    this.makeBall(ball.x, ball.y, ball.vx > 0 ? v : -v, ball.vy * -0.55, -ball.spin * 0.45, ball.lastHit, ball.entangled);
-    this.notify('GHOST PATH', Colors.cyan, 0.6);
-  }
-};
-
 const oldBalls = Renderer.prototype.balls;
 Renderer.prototype.balls = function ballsPolished() {
   oldBalls.call(this);
   const ctx = this.ctx;
   for (const b of this.game.balls) {
     if (!b.wallCue) continue;
-    b.wallCue.life -= 0.016;
     if (b.wallCue.life <= 0) { b.wallCue = null; continue; }
     const a = clamp(b.wallCue.life / 0.28, 0, 1);
     ctx.save();
@@ -238,12 +180,13 @@ Renderer.prototype.hud = function hudMinimal() {
   ctx.beginPath(); ctx.roundRect(x, y, w, 56, 14); ctx.fill();
   ctx.fillStyle = Colors.text; ctx.font = '900 12px sans-serif'; ctx.textAlign = 'center';
   const phase = g.bossPhase === 'defense' ? ' · defend' : g.bossPhase === 'offense' ? ' · attack' : '';
-  ctx.fillText('L ' + g.level + ' · ' + (g.scale ? g.scale().id : 'field') + phase, g.W / 2, y + 17);
+  const round=g.practiceMode?'Practice · No health loss':g.level<0?'Training '+(g.level+6)+'/5':'Level '+g.level+phase;
+  ctx.fillText(round, g.W / 2, y + 17);
   ctx.fillStyle = 'rgba(255,255,255,.13)'; ctx.beginPath(); ctx.roundRect(x + 18, y + 28, w - 36, 7, 4); ctx.fill();
   ctx.fillStyle = Colors.cyan; ctx.fillRect(x + 18, y + 28, (w - 36) * 0.48 * clamp(g.player.hp / g.mods.maxHp, 0, 1), 7);
   ctx.fillStyle = Colors.pink; ctx.fillRect(x + 18 + (w - 36) * 0.52, y + 28, (w - 36) * 0.48 * clamp(g.enemy.hp / g.enemy.maxHp, 0, 1), 7);
-  const b = g.balls[0]; ctx.fillStyle = Colors.muted; ctx.font = '800 9px sans-serif';
-  ctx.fillText('spin ' + (b ? b.spin.toFixed(2) : '0') + ' · load ' + Math.round(Math.abs(g.spinIntent) * 100) + '% · stamina ' + Math.round(g.enemy.stamina * 100) + '%', g.W / 2, y + 49);
+  const b = g.balls[0]; ctx.fillStyle = Colors.muted; ctx.font = '700 11px sans-serif';
+  ctx.fillText('You ' + g.player.hp + ' · Rival ' + Math.max(0,g.enemy.hp) + ' · Spin ' + Math.round(Math.abs(g.spinIntent)/1.18*100) + '%', g.W / 2, y + 49);
   if (g.freeServe && !g.bossEnemyServeBall) { ctx.fillStyle = Colors.cyan; ctx.font = '900 15px sans-serif'; ctx.fillText('Tap / click / Space to serve', g.W / 2, g.H / 2 - 72); }
   if (g.bossEnemyServeBall) { ctx.fillStyle = Colors.pink; ctx.font = '900 15px sans-serif'; ctx.fillText('receive', g.W / 2, g.H / 2 - 72); }
   if (g.dialogue) {

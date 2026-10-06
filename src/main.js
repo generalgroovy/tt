@@ -1,7 +1,9 @@
 import './pro-overhaul.js';
 import './playability-hotfix.js';
 import './shippable-polish.js';
+import './skill-depth.js';
 import { installPracticeControls } from './practice-controls.js';
+import { installUpgradeControls } from './upgrade-controls.js';
 import { Game } from './game.js';
 import { Renderer } from './render.js';
 
@@ -11,6 +13,7 @@ const ctx = canvas.getContext('2d');
 const game = new Game(canvas, button);
 const renderer = new Renderer(game, ctx);
 const syncControls = installPracticeControls(game, canvas);
+const syncUpgrades = installUpgradeControls(game, canvas);
 let last = performance.now();
 
 function point(event) {
@@ -34,23 +37,11 @@ function clickAt(x, y) {
   if (game.mode === 'playing' && game.paused) { game.paused = false; game.syncButton(); return; }
   if (['title', 'gameover', 'victory'].includes(game.mode)) { game.newRun(); return; }
   if (game.launchFreeServe()) return;
-  if (game.mode !== 'upgrade') return;
-  const compact = game.W < 820;
-  const cw = compact ? Math.min(286, game.W - 40) : 258;
-  const ch = compact ? 134 : 224;
-  const gap = 18;
-  const sx = compact ? game.W / 2 - cw / 2 : game.W / 2 - (cw * 3 + gap * 2) / 2;
-  const sy = compact ? 150 : 180;
-  for (let i = 0; i < 3; i++) {
-    const cx = compact ? sx : sx + i * (cw + gap);
-    const cy = compact ? sy + i * (ch + 14) : sy;
-    if (x >= cx && x <= cx + cw && y >= cy && y <= cy + ch) game.chooseRelic(i);
-  }
 }
 function loop(now) {
-  const dt = Math.min(0.024, (now - last) / 1000 || 0);
+  const dt = Math.max(0, Math.min(0.024, (now - last) / 1000 || 0));
   last = now;
-  try { game.update(dt); syncControls(); renderer.draw(); }
+  try { game.update(dt); syncControls(); syncUpgrades(); renderer.draw(); }
   catch (err) {
     console.error(err);
     game.err = err.message || 'Unknown error';
@@ -77,11 +68,10 @@ window.addEventListener('keydown', event => {
   if (event.repeat) return;
   if (event.code === 'Space') {
     if (['title', 'gameover', 'victory'].includes(game.mode)) game.newRun();
-    else if (game.launchFreeServe()) return;
-    else if (game.mode === 'playing' && !game.balls.length) game.serve(1);
+    else game.launchFreeServe();
   }
   if (event.code === 'KeyR') game.newRun();
-  if (event.code === 'KeyP' && game.mode === 'playing') { game.paused = !game.paused; game.syncButton(); }
+  if (event.code === 'KeyP' && game.mode === 'playing') { game.paused = !game.paused; game.keys.clear(); game.syncButton(); }
   if (event.code === 'KeyL' && game.player) { game.player.angleLocked = !game.player.angleLocked; game.player.manualAngle = game.player.angle; }
   if (event.code === 'KeyX' && game.player) game.player.angleLocked = false;
   if (game.mode === 'upgrade' && ['Digit1','Digit2','Digit3','Numpad1','Numpad2','Numpad3'].includes(event.code)) game.chooseRelic(Number(event.code.replace('Digit','').replace('Numpad','')) - 1);

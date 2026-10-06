@@ -45,6 +45,7 @@ html, body {
 #infoPanel { position: relative; }
 #infoPanel[open] { width: min(310px,calc(100vw - 24px)); padding: 8px; background: #132335; border: 1px solid #80f7ff; border-radius: 10px; }
 #infoPanel p { font-size: 14px; line-height: 1.5; }
+#infoPanel[open] { max-height: calc(100dvh - 24px); overflow-y: auto; }
 #paddleControls { position: fixed; bottom: 0; left: 0; right: 0; z-index: 3; min-height: 172px; padding: 6px max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)); background: #080f20; display: grid; align-content: end; gap: 6px; }
 .control-row { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 6px; max-width: 620px; width: 100%; margin: 0 auto; }
 #paddleControls button[aria-pressed="true"] { border-color: #80f7ff; background: #194957; }
@@ -53,3 +54,19 @@ html, body {
 #actionButton { bottom: 188px; }
 :focus-visible { outline: 3px solid #f9dc77; outline-offset: 2px; }
 @media(max-width: 420px) { #paddleControls button { font-size: 13px; padding: 7px 4px; } }
+#upgradePanel { position: fixed; z-index: 3; inset: 64px 16px 12px; max-width: 980px; margin: auto; overflow-y: auto; padding: 12px 4px; }
+#upgradePanel h1 { font-size: clamp(23px,4vw,36px); margin: 0 0 8px; }
+#buildSummary { color: #b7c7de; margin: 0 0 16px; }
+#upgradeChoices { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.upgrade-choice { display: flex; flex-direction: column; gap: 10px; text-align: left; font: inherit; color: #f5f7ff; background: #122538; border: 1px solid #576a86; border-radius: 14px; padding: 18px; cursor: pointer; min-height: 44px; }
+.upgrade-choice:hover { border-color: #80f7ff; background: #194052; }
+.upgrade-choice small { color: #80f7ff; }
+.upgrade-choice strong { font-size: 21px; }
+.upgrade-choice span { font-size: 15px; line-height: 1.5; }
+.upgrade-choice .upgrade-effect { color: #ffd166; font-size: 13px; }
+@media(max-width: 760px) {
+  #upgradeChoices { grid-template-columns: 1fr; gap: 8px; }
+  .upgrade-choice { padding: 12px; gap: 4px; }
+  .upgrade-choice strong { font-size: 18px; }
+  .upgrade-choice span { font-size: 14px; }
+}

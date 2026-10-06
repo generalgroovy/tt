@@ -16,6 +16,7 @@ export function installPractice(game) {
   const original = Object.fromEntries(['newRun','update','targetBlocks','hurtPlayer','hitEnemy','saveBest','updateSpinIntent','launchFreeServe'].map(name=>[name,game[name].bind(game)]));
   game.newRun = () => {
     practice = null;
+    game.practiceMode = false;
     touchSpin = 0;
     game.levelClearLock = false;
     game.bossEnemyServeBall = null;
@@ -61,6 +62,7 @@ export function installPractice(game) {
     start(){
       game.newRun();
       game.level=CFG.minLevel;
+      game.practiceMode=true;
       practice={step:0,x:game.player.x,y:game.player.y};
       game.enemy=game.makeEnemy();
       game.blocks=[];game.previews=[];game.dialogue=null;game.notes=[];

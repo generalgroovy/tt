@@ -22,9 +22,9 @@ Game.prototype.prepareFreeServe = function patchedPrepareFreeServe() {
 
 const oldLaunchFreeServe = Game.prototype.launchFreeServe;
 Game.prototype.launchFreeServe = function patchedLaunchFreeServe() {
-  if (this.mode !== 'playing' || !this.freeServe) return false;
+  if (this.mode !== 'playing' || this.paused || !this.freeServe) return false;
   this.freeServe = false;
-  const y = this.freeServeBall ? this.freeServeBall.y : this.player.y;
+  const y = this.player.y;
   const v = (CFG.ball.startSpeed + Math.max(0, this.level) * 8) * this.mods.ballSpeed;
   const aim = clamp(this.player ? this.player.angle : 0, -0.92, 0.92);
   const spin = clamp(this.spinIntent * CFG.spin.intentionalGain, -CFG.ball.maxSpin, CFG.ball.maxSpin);
@@ -40,7 +40,7 @@ Game.prototype.launchFreeServe = function patchedLaunchFreeServe() {
 
 const oldUpdate = Game.prototype.update;
 Game.prototype.update = function patchedUpdate(dt) {
-  if (this.freeServe && this.freeServeBall && this.player) {
+  if (!this.paused && this.mode === 'playing' && this.freeServe && this.freeServeBall && this.player) {
     this.freeServeBall.x = this.player.x + CFG.ball.serveHoldX;
     this.freeServeBall.y = this.player.y;
     this.freeServeBall.spin = this.spinIntent || 0;
@@ -50,19 +50,6 @@ Game.prototype.update = function patchedUpdate(dt) {
   if (this.enemy && Number.isFinite(this.enemy.stamina)) {
     this.enemyStaminaCarry = this.enemy.stamina;
     this.enemyWaitCarry = Number.isFinite(this.enemy.wait) ? this.enemy.wait : 0;
-  }
-};
-
-const oldPaddleHit = Game.prototype.paddleHit;
-Game.prototype.paddleHit = function patchedPaddleHit(ball, paddle, side) {
-  const before = ball.spin;
-  oldPaddleHit.call(this, ball, paddle, side);
-  if (side && ball.lastHit === 'player' && Math.abs(this.spinIntent) > .12) {
-    ball.spin = clamp(ball.spin + this.spinIntent * .28, -CFG.ball.maxSpin, CFG.ball.maxSpin);
-    this.spinIntent *= CFG.spin.releaseDecay;
-  }
-  if (Math.abs(ball.spin - before) > .18) {
-    this.notify(ball.spin > 0 ? 'TOPSPIN' : 'BACKSPIN', ball.spin > 0 ? Colors.gold : Colors.purple, .55);
   }
 };
 

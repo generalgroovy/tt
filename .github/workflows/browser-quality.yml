@@ -1,0 +1,26 @@
+name: Quantum Pong quality
+on:
+  push:
+    branches: [codex/quantum-pong-refinement]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test tests/*.test.cjs
+      - run: npm install --no-save --package-lock=false @playwright/test@1.58.2
+      - run: npx playwright install --with-deps chromium
+      - run: python3 -m http.server 8080 --bind 127.0.0.1 > /tmp/quantum-server.log 2>&1 &
+      - run: node tests/browser-quality.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quantum-browser-evidence
+          path: test-results/

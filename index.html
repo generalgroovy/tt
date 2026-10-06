@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>that's a paddlin</title>
+  <title>Quantum Pong — That's a Paddlin'</title>
   <link rel="stylesheet" href="src/styles.css" />
 </head>
 <body>
@@ -11,7 +11,7 @@
   <button id="actionButton" type="button">Start game</button>
   <aside id="gameTools" aria-label="Game tools">
     <button id="practiceButton" type="button">Practice</button>
-    <details id="infoPanel"><summary>Info</summary><p>Move the paddle with your pointer or finger. Angle sets the bounce direction; spin curves the ball. Tap the controls below or use A / D to angle and charge spin, X for automatic angle. Space serves; P pauses.</p><p>Practice has unlimited health and does not save a score. Choose Start game when ready.</p><label><input id="skipIntro" type="checkbox"> Skip calibration levels in normal games</label></details>
+    <details id="infoPanel"><summary>Info</summary><p>Move the paddle with your pointer or finger. Angle sets the bounce direction; spin curves the ball. The dotted line shows the opening serve direction, stopping before an obstacle.</p><p>A / D rotates and charges spin; X restores automatic angle. Space serves; P pauses; R restarts. Touch controls latch spin until No spin is selected.</p><p>Score past the opponent to remove health. Strong spin damages blocks more. Quick movement spends stamina and softens contact power; rest or clean-hit upgrades recover it. Choose Control, Power or Survival rewards to shape a run. Bosses alternate attack and receive phases.</p><p>Practice has unlimited health and does not save a score. Choose Start game when ready. Quantum effects are game rules inspired by physics, not a scientific simulation.</p><label><input id="skipIntro" type="checkbox"> Skip calibration levels in normal games</label></details>
   </aside>
   <section id="paddleControls" aria-label="Paddle controls" hidden>
     <p id="practiceStatus" role="status" hidden></p>
@@ -28,8 +28,11 @@
       <button id="pauseControl" type="button">Pause</button>
     </div>
   </section>
+  <section id="upgradePanel" aria-labelledby="upgradeTitle" hidden>
+    <h1 id="upgradeTitle">Choose your next edge</h1>
+    <p id="buildSummary"></p>
+    <div id="upgradeChoices"></div>
+  </section>
   <script type="module" src="src/main.js"></script>
-  <script type="module" src="src/playability-hotfix.js"></script>
-  <script type="module" src="src/shippable-polish.js"></script>
 </body>
 </html>

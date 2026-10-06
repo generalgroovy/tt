@@ -10,7 +10,7 @@ const finite = (value, fallback = 0) => Number.isFinite(value) ? value : fallbac
 
 const originalUpdate = Game.prototype.update;
 Game.prototype.update = function patchedUpdate(dt) {
-  this.clock = finite(this.clock, 0) + finite(dt, 0);
+  this.clock = finite(this.clock, 0);
   originalUpdate.call(this, dt);
   this.repairFiniteState();
 };
