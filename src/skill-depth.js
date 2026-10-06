@@ -85,7 +85,7 @@ Renderer.prototype.balls=function(){
   balls.call(this);
 };
 // Native upgrade controls own hit testing, text wrapping, focus and scrolling.
-Renderer.prototype.upgrades=function(){this.overlay(.86);};
+Renderer.prototype.upgrades=function(){this.overlay(1);};
 Renderer.prototype.pause=function(){
   this.overlay(.7);const {ctx,game:g}=this;
   ctx.save();ctx.fillStyle=Colors.text;ctx.textAlign='center';ctx.font='800 32px sans-serif';

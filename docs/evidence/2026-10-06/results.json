@@ -1,0 +1,32 @@
+[
+  {
+    "width": 1366,
+    "practice": true,
+    "pausedSpaceInert": true,
+    "digit": true,
+    "space": true,
+    "enter": true,
+    "shortViewportLastChoice": true,
+    "errors": []
+  },
+  {
+    "width": 390,
+    "practice": true,
+    "pausedSpaceInert": true,
+    "digit": true,
+    "space": true,
+    "enter": true,
+    "shortViewportLastChoice": true,
+    "errors": []
+  },
+  {
+    "width": 320,
+    "practice": true,
+    "pausedSpaceInert": true,
+    "digit": true,
+    "space": true,
+    "enter": true,
+    "shortViewportLastChoice": true,
+    "errors": []
+  }
+]

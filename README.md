@@ -28,7 +28,11 @@ Open `http://localhost:8080` in a modern browser. HTTP is required for JavaScrip
 
 Losing window focus pauses an active game. Resume with the **Resume** button, P, or a click on the canvas. Holding P does not repeatedly toggle pause. Focused buttons keep native keyboard activation; browser modifier shortcuts do not trigger game actions. The on-screen tilt buttons change angle in 15-degree steps. **Auto angle** follows motion again. **Backspin / No spin / Topspin** latch the chosen charge, so touch play does not require holding two controls together. **Serve** and **Pause** are also available as native buttons. Physical-phone ergonomics still need playtesting.
 
-The active overhaul starts with introductory stages at level -5 and continues to level 100. Older base-class comments or renderer text can describe the earlier 50-level game; the loaded overhaul defines the active progression.
+The run begins with five training rounds, then continues through level 100. Bosses appear at level 0 and every ten levels. A boss first receives your attacks, then briefly telegraphs its own serve. Pause freezes the windup and every simulation timer.
+
+The dotted serve guide shows the opening direction and spin curve, stopping before a wall or block. It does not predict the whole rally. Contact position, paddle angle and motion shape the return. Quick movement spends stamina; an exhausted contact loses up to 18% power, while the paddle still follows your pointer exactly. Rest, or use clean-hit upgrades, to recover stamina.
+
+After a round, choose a **Control**, **Power** or **Survival** reward. Native cards show both the benefit and the actual change to your build; use touch, Enter/Space, or 1/2/3 even while a card has keyboard focus. Cards scroll on short screens. Simple rewards arrive first; advanced splits, entanglement, portals and field effects unlock later. Capped or already-owned single-use rewards are omitted. Quantum terminology describes playful game rules, not a scientific simulation.
 
 ## Practice
 
@@ -40,14 +44,14 @@ Only the best score (`thats-a-paddlin-best`) and skip-intro preference (`tap-ski
 
 ## Development
 
-Use a Node.js version with the built-in test runner:
+Use **Node.js 22 or newer** (tested on Node 22 in CI). The model harness imports the shipped ES modules using Node's module syntax detection:
 
 ```sh
 node --test tests/*.test.cjs
 ```
 
-Tests cover pause/button behavior, browser shortcut guards, touch-to-serve routing, narrow dialogue layout, practice progression/isolation, touch spin/angle semantics and blocked/corrupt storage. They do not prove full level balance, collision quality, physical touch ergonomics or rendered performance.
+The 24 model/input tests cover true-contact spin discharge, swept paddle/block contacts, nearest-block ordering, rounded corner misses, arena walls, bounded time/speed, pause and boss timers, multiball transitions, meaningful upgrade effects, capped choices, practice and storage. The GitHub quality workflow also runs Chromium at 1366, 390 and 320px, with short-height upgrade access and keyboard focus/serve isolation checks. It installs test dependencies only in CI; no package installation is needed to play. See [quality evidence](docs/PROJECT-QUALITY-2026-10-06.md). These checks do not prove full level balance, physical phone ergonomics or rendered performance.
 
-`src/main.js` imports the overhaul, playability and presentation patches in explicit order, then attaches the practice/control controller. The legacy module tags are deduplicated by the browser. `src/app.js` remains a compatibility entry that imports the same bootstrap instead of duplicating handlers; it also retains its historical run-start repair patch. Do not load both entries as separate copies. The code still uses prototype patches; keep their order explicit when changing the entry point.
+`src/main.js` imports the overhaul, playability, presentation and skill-depth patches in explicit order, then attaches practice and native upgrade controllers. The HTML has one entry script. `src/upgrade-model.js` owns unlocks, capped rewards and previews; `src/collision.js` owns swept block geometry. `src/app.js` remains a compatibility entry with finite-state repair and the same bootstrap. Do not load both entries as separate copies. The code still uses prototype patches; the tests load them in the shipped order.
 
 Manual smoke check: start, serve, move and rotate, pause/resume, restart, and choose an upgrade. Repeat with browser storage disabled. Refresh ends the current run.

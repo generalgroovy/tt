@@ -19,6 +19,8 @@ const NAMES = { paddleScale:'Paddle size', ballSpeed:'Serve speed', spinPower:'S
   crit:'Critical chance', collapseBonus:'Collapse score', phaseSafe:'Safer hazards',
   pinholeChance:'Pinhole split chance', entanglePower:'Entanglement strength', portalMastery:'Steady portals',
   gravityWell:'Gravity strength', bossBane:'Boss damage', shear:'Block slowing' };
+const PERCENT=new Set(['paddleScale','ballSpeed','spinPower','staminaSave','blockKick','trailPower',
+  'pathFork','wallBrake','repulsor','scoreScale','crit','pinholeChance','entanglePower']);
 
 export function capMods(mods) {
   for (const [key, limit] of Object.entries(CAPS)) if(Number.isFinite(mods[key])) mods[key]=Math.min(limit,mods[key]);
@@ -31,7 +33,8 @@ export function previewUpgrade(relic, game) {
   const changes=[];
   for(const [key,value] of Object.entries(mods)) {
     if(value===game.mods[key] || !NAMES[key])continue;
-    const format=v=>typeof v==='boolean'?(v?'on':'off'):Number(Number(v).toFixed(2)).toString();
+    const format=v=>key==='shear'?(v?'3s':'off'):typeof v==='boolean'?(v?'on':'off'):PERCENT.has(key)?Math.round(v*100)+'%'
+      :Number(Number(v).toFixed(2)).toString()+(key==='comboWindow'?'s':'');
     changes.push(`${NAMES[key]} ${format(game.mods[key])} → ${format(value)}`);
   }
   if(player.hp!==game.player.hp)changes.push(`Health ${game.player.hp} → ${Math.min(player.hp,mods.maxHp)}`);

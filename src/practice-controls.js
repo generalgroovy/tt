@@ -13,7 +13,7 @@ export const LESSONS = [
 export function installPractice(game) {
   let practice = null;
   let touchSpin = 0;
-  const original = Object.fromEntries(['newRun','update','targetBlocks','hurtPlayer','hitEnemy','saveBest','updateSpinIntent','launchFreeServe'].map(name=>[name,game[name].bind(game)]));
+  const original = Object.fromEntries(['newRun','update','targetBlocks','hurtPlayer','hitEnemy','saveBest','updateSpinIntent','launchFreeServe','prepareFreeServe'].map(name=>[name,game[name].bind(game)]));
   game.newRun = () => {
     practice = null;
     game.practiceMode = false;
@@ -26,6 +26,7 @@ export function installPractice(game) {
     original.newRun();
   };
   game.targetBlocks = () => practice ? 0 : original.targetBlocks();
+  game.prepareFreeServe = () => {original.prepareFreeServe();if(practice)game.notes=[];};
   game.hurtPlayer = n => {
     if (!practice) return original.hurtPlayer(n);
     game.player.hp = game.player.maxHp;

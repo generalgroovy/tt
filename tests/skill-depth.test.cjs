@@ -37,10 +37,14 @@ test('swept blocks hit the nearest obstacle independent of array order and ignor
 test('pause freezes boss serve, clock, block motion, notes and wall cues; pause cannot serve',async()=>{
   const g=await loadGame();g.level=0;g.enemy=g.makeEnemy();g.hitEnemy(100,500,200);
   assert.ok(g.bossEnemyServeBall);g.paused=true;
-  const before=JSON.stringify({clock:g.clock,held:g.bossEnemyServeBall,enemy:g.enemy,notes:g.notes});
+  g.blocks=[g.makeBlock(400,200,'moving')];
+  g.makeBall(200,200,800,0).wallCue={life:.2,x:200,y:200,vx:800,vy:0,spin:1};
+  const snapshot=()=>JSON.stringify({clock:g.clock,held:g.bossEnemyServeBall,enemy:g.enemy,notes:g.notes,blocks:g.blocks,balls:g.balls});
+  const before=snapshot();
   for(let i=0;i<100;i++)g.update(.024);
-  assert.equal(JSON.stringify({clock:g.clock,held:g.bossEnemyServeBall,enemy:g.enemy,notes:g.notes}),before);
-  assert.equal(g.launchFreeServe(),false);assert.equal(g.balls.length,0);
+  assert.equal(snapshot(),before);
+  assert.equal(g.launchFreeServe(),false);assert.equal(g.balls.length,1);
+  g.balls=[];
   g.paused=false;for(let i=0;i<36;i++)g.update(.024);
   assert.equal(g.bossEnemyServeBall,null);assert.ok(g.balls.length>0);
 });
@@ -90,12 +94,16 @@ test('boss damage upgrade applies once per goal and predictable portals remove d
 });
 
 test('conserving stamina improves return power without changing pointer movement',async()=>{
+  const positions=[];
   const hit=async stamina=>{
     const g=await loadGame(),p=g.player;p.stamina=stamina;
     const b=g.makeBall(p.x-30,p.y,-1200,0,0,'enemy');b.prevX=p.x+70;b.prevY=p.y;
-    g.paddleHit(b,p,true);return Math.hypot(b.vx,b.vy);
+    g.paddleHit(b,p,true);const speed=Math.hypot(b.vx,b.vy);
+    g.pointer={active:true,x:130,y:350};g.updatePlayer(.016);positions.push([p.x,p.y]);
+    return speed;
   };
   assert.ok(await hit(1)>await hit(0)*1.15);
+  assert.deepEqual(positions,[[130,350],[130,350]]);
 });
 
 test('serve guide changes with angle/spin and stops at obstacles without mutating game',async()=>{
