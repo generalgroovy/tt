@@ -127,7 +127,7 @@ export function installPracticeControls(game, canvas) {
   game.resize=()=>{
     resize();
     game.W=Math.max(280,innerWidth);
-    game.H=Math.max(220,innerHeight-224);
+    game.H=Math.max(180,innerHeight-224);
     game.canvas.width=Math.floor(game.W*game.dpr);
     game.canvas.style.width=game.W+'px';
     game.canvas.height=Math.floor(game.H*game.dpr);

@@ -187,7 +187,9 @@ Renderer.prototype.hud = function hudMinimal() {
   ctx.fillStyle = Colors.pink; ctx.fillRect(x + 18 + (w - 36) * 0.52, y + 28, (w - 36) * 0.48 * clamp(g.enemy.hp / g.enemy.maxHp, 0, 1), 7);
   const b = g.balls[0]; ctx.fillStyle = Colors.muted; ctx.font = '700 11px sans-serif';
   ctx.fillText('You ' + g.player.hp + ' · Rival ' + Math.max(0,g.enemy.hp) + ' · Spin ' + Math.round(Math.abs(g.spinIntent)/1.18*100) + '%', g.W / 2, y + 49);
-  if (g.freeServe && !g.bossEnemyServeBall) { ctx.fillStyle = Colors.cyan; ctx.font = '900 15px sans-serif'; ctx.fillText('Tap / click / Space to serve', g.W / 2, g.H / 2 - 72); }
+  // The native Serve control remains visible. Avoid duplicating its prompt over
+  // the health HUD when the arena is short, as on landscape phones.
+  if (g.freeServe && !g.bossEnemyServeBall && g.H >= 300) { ctx.fillStyle = Colors.cyan; ctx.font = '900 15px sans-serif'; ctx.fillText('Tap / click / Space to serve', g.W / 2, g.H / 2 - 72); }
   if (g.bossEnemyServeBall) { ctx.fillStyle = Colors.pink; ctx.font = '900 15px sans-serif'; ctx.fillText('receive', g.W / 2, g.H / 2 - 72); }
   if (g.dialogue) {
     const dw = Math.min(380, g.W - 36), dx = g.W - dw - 18, dy = 78, a = clamp(g.dialogue.life / g.dialogue.maxLife, 0, 1);

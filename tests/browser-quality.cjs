@@ -7,8 +7,8 @@ const assert=require('node:assert/strict');
   mkdirSync('test-results',{recursive:true});
   const browser=await chromium.launch(),results=[];
   try{
-    for(const width of [1366,390,320]){
-      const context=await browser.newContext({viewport:{width,height:width===1366?768:844},hasTouch:width<500});
+    for(const width of [1366,844,390,320]){
+      const context=await browser.newContext({viewport:{width,height:width===1366?768:width===844?420:844},hasTouch:width<1000});
       const page=await context.newPage(),errors=[];
       page.on('pageerror',error=>errors.push(error.message));
       page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
@@ -18,6 +18,8 @@ const assert=require('node:assert/strict');
       });
       await page.goto('http://127.0.0.1:8080/');
       await page.getByRole('button',{name:'Practice · learn controls',exact:true}).click();
+      const layout=await page.evaluate(()=>({canvasBottom:document.querySelector('canvas').getBoundingClientRect().bottom,controlsTop:document.getElementById('paddleControls').getBoundingClientRect().top}));
+      assert.ok(layout.canvasBottom<=layout.controlsTop,JSON.stringify(layout));
       const canvas=page.locator('#game'),box=await canvas.boundingBox();
       await page.mouse.move(80,box.y+box.height/2+55);
       await expect(page.locator('#practiceStatus')).toContainText('Tilt');
