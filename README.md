@@ -1,6 +1,6 @@
 # Quantum Pong / That's a Paddlin'
 
-The preserved browser edition of `tt`: pointer-controlled paddle combat with spin, branching balls, quantum-inspired obstacles and upgrade choices. This branch is **`codex/quantum-pong-refinement`**. Current `tt/main` contains the separate Relay Rift desktop game; do not merge this browser tree over it.
+The preserved browser edition of `tt`: paddle combat with spin, branching balls, quantum-inspired obstacles and upgrade choices. This branch is **`codex/quantum-pong-refinement`**. Current `tt/main` contains the separate Relay Rift desktop game; do not merge this browser tree over it.
 
 ## Run
 
@@ -16,15 +16,17 @@ Open `http://localhost:8080` in a modern browser. HTTP is required for JavaScrip
 
 | Input | Action |
 | --- | --- |
-| Mouse or touch | Position the paddle inside the left side of the arena |
+| Arrow keys, mouse or touch | Position the paddle inside the left side of the arena |
 | Tap, click or Space | Start / serve |
-| A/D or arrows | Rotate the paddle and load spin |
+| A/D (or Q/E) | Rotate the paddle and load spin |
 | W/S | Adjust the face angle |
 | Shift | Rotate faster |
 | L / X | Lock angle / return to movement angle |
 | 1 / 2 / 3 | Choose an offered upgrade |
 | P | Pause/resume |
 | R | Restart the run |
+
+Arrow keys move in both dimensions; diagonal movement has the same speed as straight movement. Release to stay in place. Moving the pointer takes over again. Arrows previously duplicated angle controls; use A/D or Q/E to rotate, and W/S for fine angle adjustment. You can complete the four practice steps entirely with the keyboard.
 
 Losing window focus pauses an active game. Resume with the **Resume** button, P, or a click on the canvas. Holding P does not repeatedly toggle pause. Focused buttons keep native keyboard activation; browser modifier shortcuts do not trigger game actions. Tilt, spin and Pause/Resume controls retain keyboard focus for repeated adjustments; starting play and serving focus the arena. The on-screen tilt buttons change angle in 15-degree steps. **Auto angle** follows motion again. **Backspin / No spin / Topspin** latch the chosen charge, so touch play does not require holding two controls together. A short status explains whose serve it is, an active rally, or pause. Physical-phone ergonomics still need playtesting.
 
@@ -50,7 +52,7 @@ Use **Node.js 22 or newer** (tested on Node 22 in CI). The model harness imports
 node --test tests/*.test.cjs
 ```
 
-The 26 model/input/rendering tests cover true-contact spin discharge, swept paddle/block contacts, nearest-block ordering, rounded corner misses, arena walls, bounded time/speed, pause and boss timers, multiball transitions, meaningful upgrade effects, capped choices, practice, control guidance, short-screen HUD and storage. The GitHub quality workflow also runs Chromium at 1366 × 768, 844 × 420, 390 × 844 and 320 × 844, including arena/control separation, short-height upgrade access and keyboard focus/serve isolation. It installs test dependencies only in CI; no package installation is needed to play. See [quality evidence](docs/PROJECT-QUALITY-2026-10-06.md) and [UX iteration](docs/PROJECT-UX-2026-10-07.md). These checks do not prove full level balance, physical phone ergonomics or rendered performance.
+The 30 model/input/rendering tests cover true-contact spin discharge, swept paddle/block contacts, nearest-block ordering, rounded corner misses, arena walls, bounded time/speed, pause and boss timers, multiball transitions, meaningful upgrade effects, capped choices, practice, normalized keyboard movement, pointer handoff, control guidance, short-screen HUD and storage. The GitHub quality workflow also runs Chromium at 1366 × 768, 844 × 420, 390 × 844 and 320 × 844, including arena/control separation, short-height upgrade access and keyboard focus/serve isolation. It installs test dependencies only in CI; no package installation is needed to play. See [quality evidence](docs/PROJECT-QUALITY-2026-10-06.md), [UX iteration](docs/PROJECT-UX-2026-10-07.md) and [keyboard flow](docs/PROJECT-UX-FLOW-2026-10-07.md). These checks do not prove full level balance, physical phone ergonomics or rendered performance.
 
 `src/main.js` imports the overhaul, playability, presentation and skill-depth patches in explicit order, then attaches practice and native upgrade controllers. The HTML has one entry script. `src/upgrade-model.js` owns unlocks, capped rewards and previews; `src/collision.js` owns swept block geometry. `src/app.js` remains a compatibility entry with finite-state repair and the same bootstrap. Do not load both entries as separate copies. The code still uses prototype patches; the tests load them in the shipped order.
 

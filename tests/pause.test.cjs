@@ -15,6 +15,13 @@ for(const entry of ['main.js'])test(`${entry}: pause offers Resume; repeated P d
  buttonEvents.click();assert.equal(game.paused,false);assert.equal(runs,0);assert.equal(focused,true);
  events.keydown({code:'KeyP',repeat:false});assert.equal(game.paused,true);
  events.keydown({code:'KeyP',repeat:true});assert.equal(game.paused,true);
+ events.keydown({code:'ArrowDown',repeat:false,preventDefault(){}});
+ assert.equal(game.keys.has('ArrowDown'),false);
+ buttonEvents.click();
+ events.keydown({code:'ArrowDown',repeat:true,preventDefault(){}});
+ assert.equal(game.keys.has('ArrowDown'),false);
+ events.keydown({code:'ArrowDown',repeat:false,preventDefault(){}});
+ assert.equal(game.keys.has('ArrowDown'),true);
 });
 test('pause button exposes an accessible Resume label only during paused gameplay',()=>{
  const source=readFileSync(path.join(__dirname,'..','src','game.js'),'utf8');

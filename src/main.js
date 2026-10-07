@@ -61,10 +61,14 @@ canvas.addEventListener('pointerdown', event => { const p = updatePointer(event,
 canvas.addEventListener('pointermove', event => { updatePointer(event); event.preventDefault(); });
 canvas.addEventListener('pointerleave', event => { if (event.pointerType !== 'mouse') game.pointer.active = false; });
 canvas.addEventListener('touchmove', event => event.preventDefault(), { passive: false });
+canvas.addEventListener('blur', () => game.keys.clear());
 window.addEventListener('keydown', event => {
   if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || event.target?.isContentEditable || event.target?.closest?.('input,textarea,select,button,summary,a[href]')) return;
-  game.keys.add(event.code);
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
+  // Ignore repeats from a key held across pause or a focus change. Native
+  // controls above keep their own keys and never move the paddle underneath.
+  if (event.repeat && !game.keys.has(event.code)) return;
+  if (!game.paused) game.keys.add(event.code);
   if (event.repeat) return;
   if (event.code === 'Space') {
     if (['title', 'gameover', 'victory'].includes(game.mode)) game.newRun();

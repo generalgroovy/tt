@@ -21,7 +21,15 @@ const assert=require('node:assert/strict');
       const layout=await page.evaluate(()=>({canvasBottom:document.querySelector('canvas').getBoundingClientRect().bottom,controlsTop:document.getElementById('paddleControls').getBoundingClientRect().top}));
       assert.ok(layout.canvasBottom<=layout.controlsTop,JSON.stringify(layout));
       const canvas=page.locator('#game'),box=await canvas.boundingBox();
-      await page.mouse.move(80,box.y+box.height/2+55);
+      if(width===1366){
+        await canvas.focus();
+        await page.keyboard.down('ArrowDown');
+        await expect(page.locator('#practiceStatus')).toContainText('Tilt');
+        await page.keyboard.up('ArrowDown');
+        const y=await page.evaluate(()=>testGame.player.y);
+        await page.waitForTimeout(100);
+        assert.equal(await page.evaluate(()=>testGame.player.y),y);
+      }else await page.mouse.move(80,box.y+box.height/2+55);
       await expect(page.locator('#practiceStatus')).toContainText('Tilt');
       await page.getByRole('button',{name:'Tilt paddle clockwise'}).click();
       assert.equal(await page.locator('#angleRight').evaluate(el=>el===document.activeElement),true);

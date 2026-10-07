@@ -7,11 +7,11 @@
   <link rel="stylesheet" href="src/styles.css" />
 </head>
 <body>
-  <canvas id="game" tabindex="0" aria-label="that's a paddlin game canvas"></canvas>
+  <canvas id="game" tabindex="0" aria-label="Paddle arena. Arrow keys move; A and D tilt; Space serves; P pauses."></canvas>
   <button id="actionButton" type="button">Start game</button>
   <aside id="gameTools" aria-label="Game tools">
     <button id="practiceButton" type="button">Practice · learn controls</button>
-    <details id="infoPanel"><summary>Info</summary><p>Move the paddle with your pointer or finger. Angle sets the bounce direction; spin curves the ball. The dotted line shows the opening serve direction, stopping before an obstacle.</p><p>A / D rotates and charges spin; X restores automatic angle. Space serves; P pauses; R restarts. Touch controls latch spin until No spin is selected.</p><p>Score past the opponent to remove health. Strong spin damages blocks more. Quick movement spends stamina and softens contact power; rest or clean-hit upgrades recover it. Choose Control, Power or Survival rewards to shape a run. Bosses alternate attack and receive phases.</p><p>Practice has unlimited health and does not save a score. Choose Start game when ready. Quantum effects are game rules inspired by physics, not a scientific simulation.</p><label><input id="skipIntro" type="checkbox"> Skip calibration levels in normal games</label></details>
+    <details id="infoPanel"><summary>Info</summary><p>Move with arrow keys, your pointer or a finger. Angle sets the bounce direction; spin curves the ball. The dotted line shows the opening serve direction, stopping before an obstacle.</p><p>A / D rotates and charges spin; W / S fine-tunes the face. X restores automatic angle. Space serves; P pauses; R restarts. Touch controls latch spin until No spin is selected.</p><p>Score past the opponent to remove health. Strong spin damages blocks more. Quick movement spends stamina and softens contact power; rest or clean-hit upgrades recover it. Choose Control, Power or Survival rewards to shape a run. Bosses alternate attack and receive phases.</p><p>Practice has unlimited health and does not save a score. Choose Start game when ready. Quantum effects are game rules inspired by physics, not a scientific simulation.</p><label><input id="skipIntro" type="checkbox"> Skip calibration levels in normal games</label></details>
   </aside>
   <section id="paddleControls" aria-label="Paddle controls" hidden>
     <p id="practiceStatus" role="status" hidden></p>

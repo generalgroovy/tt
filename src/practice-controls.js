@@ -2,7 +2,7 @@ import { CFG } from './config.js';
 import { readSetting } from './storage.js';
 
 export const LESSONS = [
-  '1 / 4 · Move your paddle with the pointer or a finger.',
+  '1 / 4 · Move your paddle: arrow keys, pointer or finger.',
   '2 / 4 · Tilt the paddle with ↶ / ↷ or A / D.',
   '3 / 4 · Choose Backspin or Topspin to charge a curved shot.',
   '4 / 4 · Serve the charged ball and watch its curve.',

@@ -10,7 +10,7 @@ export const CFG = {
   paddle: {
     w: 12, h: 56, enemyH: 62, staminaDrain: 0.52, enemyDrain: 0.42,
     staminaRefill: 1.75, staminaPause: 0.46, maxAngle: Math.PI * 160 / 180,
-    angleFollow: 12
+    angleFollow: 12, keyboardSpeed: 520
   },
   ball: {
     r: 7, startSpeed: 590, minSpeed: 610, speedSoftCap: 1950, speedCompression: 0.986,
