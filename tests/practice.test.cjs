@@ -40,6 +40,6 @@ test('control guidance explains pause, opponent serve, practice progress and nor
  game.paused=true;assert.match(context.controlMessage(game,practice),/Paused.*Resume/);
  game.paused=false;game.newRun();game.freeServe=true;
  assert.match(context.controlMessage(game,practice),/Your serve/);
- game.freeServe=false;assert.match(context.controlMessage(game,practice),/Rally.*after a miss/);
+ game.freeServe=false;assert.match(context.controlMessage(game,practice),/Rally.*protect your health/);
  game.bossEnemyServeBall={};assert.match(context.controlMessage(game,practice),/Opponent serving/);
 });

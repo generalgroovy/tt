@@ -54,6 +54,7 @@ html, body {
 #paddleControls button:disabled { opacity: .45; cursor: default; }
 #practiceStatus { margin: 0 auto 4px; max-width: 620px; font-size: 14px; min-height: 36px; }
 #actionButton { bottom: 188px; }
+body:has(#paddleControls:not([hidden])) #actionButton { display: none; }
 :focus-visible { outline: 3px solid #f9dc77; outline-offset: 2px; }
 @media(max-width: 420px) { #paddleControls button { font-size: 13px; padding: 7px 4px; } }
 @media(max-height: 520px) { #gameTools .title-practice { bottom: 60px; } body:has(.title-practice) #actionButton { bottom: 8px; } }

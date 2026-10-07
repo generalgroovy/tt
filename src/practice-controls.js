@@ -15,7 +15,7 @@ export function controlMessage(game, practice) {
   if (practice.active) return LESSONS[practice.step] || '';
   return game.freeServe
     ? 'Your serve · Angle sets direction. Spin curves the ball.'
-    : 'Rally · Return the ball. Serve becomes available after a miss.';
+    : 'Rally · Return the ball to protect your health.';
 }
 
 // Practice wraps the same physics and input methods as a normal run.
