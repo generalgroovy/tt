@@ -32,3 +32,21 @@ test('narrow HUD wraps introductory dialogue inside its panel and names the serv
  for(const [text,x,y,width] of lines){assert.ok(ctx.measureText(text).width<=width);assert.ok(x>=panel[0]);assert.ok(x+width<=panel[0]+panel[2]);assert.ok(y<panel[1]+panel[3]);}
  assert.ok(texts.some(args=>args[0]==='Tap / click / Space to serve'));
 });
+
+test('short arena keeps both serve captions out of the health HUD while retaining health',()=>{
+ const texts=[];
+ const ctx={save(){},restore(){},beginPath(){},roundRect(){},fill(){},fillRect(){},fillText(text){texts.push(text);}};
+ class Renderer {}
+ const context=vm.createContext({Renderer,Colors:{},clamp:(value,min,max)=>Math.max(min,Math.min(max,value))});
+ const source=readFileSync(path.join(__dirname,'../src/shippable-polish.js'),'utf8');
+ vm.runInContext(source.slice(source.indexOf('Renderer.prototype.hud = function hudMinimal')),context);
+ const renderer=new Renderer();renderer.ctx=ctx;renderer.game={W:844,H:196,level:0,player:{hp:5},enemy:{hp:5,maxHp:5,stamina:1},mods:{maxHp:5},balls:[],spinIntent:0,freeServe:true,notes:[]};
+ for(const boss of [false,true]){
+   renderer.game.bossEnemyServeBall=boss?{}:null;
+   texts.length=0;renderer.game.H=196;renderer.hud();
+   assert.ok(texts.some(text=>text.startsWith('You 5')));
+   assert.ok(!texts.includes('receive')&&!texts.includes('Tap / click / Space to serve'));
+   texts.length=0;renderer.game.H=300;renderer.hud();
+   assert.ok(texts.includes(boss?'receive':'Tap / click / Space to serve'));
+ }
+});
