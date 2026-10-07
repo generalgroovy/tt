@@ -2,12 +2,21 @@ import { CFG } from './config.js';
 import { readSetting } from './storage.js';
 
 export const LESSONS = [
-  'Move your paddle with the pointer or a finger.',
-  'Tilt the paddle with ↶ / ↷ or A / D.',
-  'Choose Backspin or Topspin to charge a curved shot.',
-  'Serve the charged ball and watch its curve.',
+  '1 / 4 · Move your paddle with the pointer or a finger.',
+  '2 / 4 · Tilt the paddle with ↶ / ↷ or A / D.',
+  '3 / 4 · Choose Backspin or Topspin to charge a curved shot.',
+  '4 / 4 · Serve the charged ball and watch its curve.',
   'Ready. Try different angles and spin; misses cost no health.'
 ];
+
+export function controlMessage(game, practice) {
+  if (game.paused) return 'Paused · Resume when you are ready.';
+  if (game.bossEnemyServeBall) return 'Opponent serving · Get ready to return the ball.';
+  if (practice.active) return LESSONS[practice.step] || '';
+  return game.freeServe
+    ? 'Your serve · Angle sets direction. Spin curves the ball.'
+    : 'Rally · Return the ball. Serve becomes available after a miss.';
+}
 
 // Practice wraps the same physics and input methods as a normal run.
 export function installPractice(game) {
@@ -84,21 +93,24 @@ export function installPracticeControls(game, canvas) {
     lastUi=key;
     panel.hidden=game.mode!=='playing';
     practiceButton.hidden=game.mode==='playing'&&!practice.active;
-    practiceButton.textContent=practice.active?'Start game':'Practice';
-    status.hidden=!practice.active;
-    const instruction=LESSONS[practice.step]||'';
+    practiceButton.textContent=practice.active?'Start game':'Practice · learn controls';
+    practiceButton.classList.toggle('title-practice',game.mode==='title');
+    status.hidden=game.mode!=='playing';
+    const instruction=controlMessage(game,practice);
     if(status.textContent!==instruction)status.textContent=instruction;
     $('angleAuto').setAttribute('aria-pressed',String(!game.player?.angleLocked));
     $('serveButton').disabled=!game.freeServe||game.paused||Boolean(game.bossEnemyServeBall);
     $('pauseControl').textContent=game.paused?'Resume':'Pause';
     spinButtons.forEach(button=>button.setAttribute('aria-pressed',String(Number(button.dataset.spin)===practice.spin)));
   };
-  const act=fn=>()=>{fn();sync();canvas.focus();};
-  practiceButton.addEventListener('click',act(()=>practice.active?game.newRun():practice.start()));
+  // Editing controls retain focus for repeated keyboard adjustments. Only
+  // starting play or serving intentionally hands focus back to the arena.
+  const act=(fn,play=false)=>()=>{fn();sync();if(play)canvas.focus();};
+  practiceButton.addEventListener('click',act(()=>practice.active?game.newRun():practice.start(),true));
   $('angleLeft').addEventListener('click',act(()=>practice.tilt(-1)));
   $('angleRight').addEventListener('click',act(()=>practice.tilt(1)));
   $('angleAuto').addEventListener('click',act(()=>{if(game.player)game.player.angleLocked=false;}));
-  $('serveButton').addEventListener('click',act(()=>game.launchFreeServe()));
+  $('serveButton').addEventListener('click',act(()=>game.launchFreeServe(),true));
   $('pauseControl').addEventListener('click',act(()=>{game.paused=!game.paused;game.keys.clear();game.syncButton();}));
   spinButtons.forEach(button=>button.addEventListener('click',act(()=>practice.spinTo(Number(button.dataset.spin)))));
   const info=$('infoPanel');

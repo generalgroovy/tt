@@ -10,7 +10,7 @@
   <canvas id="game" tabindex="0" aria-label="that's a paddlin game canvas"></canvas>
   <button id="actionButton" type="button">Start game</button>
   <aside id="gameTools" aria-label="Game tools">
-    <button id="practiceButton" type="button">Practice</button>
+    <button id="practiceButton" type="button">Practice · learn controls</button>
     <details id="infoPanel"><summary>Info</summary><p>Move the paddle with your pointer or finger. Angle sets the bounce direction; spin curves the ball. The dotted line shows the opening serve direction, stopping before an obstacle.</p><p>A / D rotates and charges spin; X restores automatic angle. Space serves; P pauses; R restarts. Touch controls latch spin until No spin is selected.</p><p>Score past the opponent to remove health. Strong spin damages blocks more. Quick movement spends stamina and softens contact power; rest or clean-hit upgrades recover it. Choose Control, Power or Survival rewards to shape a run. Bosses alternate attack and receive phases.</p><p>Practice has unlimited health and does not save a score. Choose Start game when ready. Quantum effects are game rules inspired by physics, not a scientific simulation.</p><label><input id="skipIntro" type="checkbox"> Skip calibration levels in normal games</label></details>
   </aside>
   <section id="paddleControls" aria-label="Paddle controls" hidden>
@@ -19,7 +19,7 @@
       <button id="angleLeft" type="button" aria-label="Tilt paddle counterclockwise">↶</button>
       <button id="angleAuto" type="button" aria-pressed="true">Auto angle</button>
       <button id="angleRight" type="button" aria-label="Tilt paddle clockwise">↷</button>
-      <button id="serveButton" type="button">Serve</button>
+      <button id="serveButton" type="button" aria-describedby="practiceStatus">Serve</button>
     </div>
     <div class="control-row" aria-label="Spin direction">
       <button data-spin="-1" type="button" aria-pressed="false">Backspin</button>

@@ -26,7 +26,7 @@ Open `http://localhost:8080` in a modern browser. HTTP is required for JavaScrip
 | P | Pause/resume |
 | R | Restart the run |
 
-Losing window focus pauses an active game. Resume with the **Resume** button, P, or a click on the canvas. Holding P does not repeatedly toggle pause. Focused buttons keep native keyboard activation; browser modifier shortcuts do not trigger game actions. The on-screen tilt buttons change angle in 15-degree steps. **Auto angle** follows motion again. **Backspin / No spin / Topspin** latch the chosen charge, so touch play does not require holding two controls together. **Serve** and **Pause** are also available as native buttons. Physical-phone ergonomics still need playtesting.
+Losing window focus pauses an active game. Resume with the **Resume** button, P, or a click on the canvas. Holding P does not repeatedly toggle pause. Focused buttons keep native keyboard activation; browser modifier shortcuts do not trigger game actions. Tilt, spin and Pause/Resume controls retain keyboard focus for repeated adjustments; starting play and serving focus the arena. The on-screen tilt buttons change angle in 15-degree steps. **Auto angle** follows motion again. **Backspin / No spin / Topspin** latch the chosen charge, so touch play does not require holding two controls together. A short status explains whose serve it is, an active rally, or pause. Physical-phone ergonomics still need playtesting.
 
 The run begins with five training rounds, then continues through level 100. Bosses appear at level 0 and every ten levels. A boss first receives your attacks, then briefly telegraphs its own serve. Pause freezes the windup and every simulation timer.
 
@@ -36,7 +36,7 @@ After a round, choose a **Control**, **Power** or **Survival** reward. Native ca
 
 ## Practice
 
-Choose **Practice** before a run. Move the paddle, tilt it, charge spin and serve: each instruction advances from the action actually performed. Practice has no blocks, unlimited health and no best-score writes; scoring past the opponent returns to a free serve. **Start game** exits practice into a clean normal run. The Info panel holds full controls and pauses active play when opened.
+Choose **Practice · learn controls** beside the title-screen start action. Move the paddle, tilt it, charge spin and serve: four numbered instructions advance from the action actually performed. Practice has no blocks, unlimited health and no best-score writes; scoring past the opponent returns to a free serve. **Start game** exits practice into a clean normal run. The Info panel holds full controls and pauses active play when opened.
 
 ## Saved data
 
@@ -50,7 +50,7 @@ Use **Node.js 22 or newer** (tested on Node 22 in CI). The model harness imports
 node --test tests/*.test.cjs
 ```
 
-The 24 model/input tests cover true-contact spin discharge, swept paddle/block contacts, nearest-block ordering, rounded corner misses, arena walls, bounded time/speed, pause and boss timers, multiball transitions, meaningful upgrade effects, capped choices, practice and storage. The GitHub quality workflow also runs Chromium at 1366, 390 and 320px, with short-height upgrade access and keyboard focus/serve isolation checks. It installs test dependencies only in CI; no package installation is needed to play. See [quality evidence](docs/PROJECT-QUALITY-2026-10-06.md). These checks do not prove full level balance, physical phone ergonomics or rendered performance.
+The 25 model/input tests cover true-contact spin discharge, swept paddle/block contacts, nearest-block ordering, rounded corner misses, arena walls, bounded time/speed, pause and boss timers, multiball transitions, meaningful upgrade effects, capped choices, practice, control guidance and storage. The GitHub quality workflow also runs Chromium at 1366, 390 and 320px, with short-height upgrade access and keyboard focus/serve isolation checks. It installs test dependencies only in CI; no package installation is needed to play. See [quality evidence](docs/PROJECT-QUALITY-2026-10-06.md) and [UX iteration](docs/PROJECT-UX-2026-10-07.md). These checks do not prove full level balance, physical phone ergonomics or rendered performance.
 
 `src/main.js` imports the overhaul, playability, presentation and skill-depth patches in explicit order, then attaches practice and native upgrade controllers. The HTML has one entry script. `src/upgrade-model.js` owns unlocks, capped rewards and previews; `src/collision.js` owns swept block geometry. `src/app.js` remains a compatibility entry with finite-state repair and the same bootstrap. Do not load both entries as separate copies. The code still uses prototype patches; the tests load them in the shipped order.
 

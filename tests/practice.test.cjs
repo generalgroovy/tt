@@ -12,7 +12,7 @@ function setup(){
   updateSpinIntent(dir,dt){this.spinIntent+=dir*dt;},launchFreeServe(){if(!this.freeServe)return false;this.freeServe=false;return true;}
  };
  const context=vm.createContext({CFG:{minLevel:-5,paddle:{maxAngle:1}},game});vm.runInContext(source+';globalThis.practice=installPractice(game)',context);
- return{game,practice:context.practice};
+ return{game,practice:context.practice,context};
 }
 test('practice teaches performed movement, angle and spin serve without score or health loss',()=>{
  const {game,practice}=setup();practice.start();
@@ -32,4 +32,14 @@ test('touch spin stays selected, keyboard wins temporarily, neutral clears charg
  practice.spinTo(0);assert.equal(game.spinIntent,0);
  for(let i=0;i<100;i++)practice.tilt(1);assert.equal(game.player.manualAngle,1);
  game.paused=true;game.player.x+=50;game.update(.1);assert.equal(practice.step,0);
+});
+
+test('control guidance explains pause, opponent serve, practice progress and normal rally',()=>{
+ const {game,practice,context}=setup();
+ practice.start();assert.match(context.controlMessage(game,practice),/1 \/ 4/);
+ game.paused=true;assert.match(context.controlMessage(game,practice),/Paused.*Resume/);
+ game.paused=false;game.newRun();game.freeServe=true;
+ assert.match(context.controlMessage(game,practice),/Your serve/);
+ game.freeServe=false;assert.match(context.controlMessage(game,practice),/Rally.*after a miss/);
+ game.bossEnemyServeBall={};assert.match(context.controlMessage(game,practice),/Opponent serving/);
 });
