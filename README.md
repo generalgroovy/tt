@@ -1,4 +1,4 @@
-# Quantum Pong / That's a Paddlin'
+# Quantum Pong
 
 The preserved browser edition of `tt`: paddle combat with spin, branching balls, quantum-inspired obstacles and upgrade choices. This branch is **`codex/quantum-pong-refinement`**. Current `tt/main` contains the separate Relay Rift desktop game; do not merge this browser tree over it.
 

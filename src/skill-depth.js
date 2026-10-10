@@ -91,5 +91,5 @@ Renderer.prototype.pause=function(){
   ctx.save();ctx.fillStyle=Colors.text;ctx.textAlign='center';ctx.font='800 32px sans-serif';
   ctx.fillText('Paused',g.W/2,g.H*.4,g.W-32);
   ctx.font='16px sans-serif';ctx.fillStyle=Colors.muted;
-  ctx.fillText('Resume when ready.',g.W/2,g.H*.4+32,g.W-32);ctx.restore();
+  ctx.fillText('P or Resume continues this rally.',g.W/2,g.H*.4+32,g.W-32);ctx.restore();
 };

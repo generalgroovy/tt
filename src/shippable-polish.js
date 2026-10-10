@@ -215,8 +215,8 @@ Renderer.prototype.title = function titleCompact() {
   this.overlay(.72);
   ctx.save();ctx.textAlign='center';
   ctx.fillStyle=Colors.text;ctx.font=`900 ${clamp(g.W*.075,26,64)}px sans-serif`;
-  ctx.fillText("that's a paddlin",g.W/2,g.H*.36,g.W-36);
+  ctx.fillText("Quantum Pong",g.W/2,g.H*.36,g.W-36);
   ctx.fillStyle=Colors.cyan;ctx.font='800 18px sans-serif';
-  ctx.fillText('Angle. Spin. Survive.',g.W/2,g.H*.36+38,g.W-36);
+  ctx.fillText('Return the ball past your opponent.',g.W/2,g.H*.36+38,g.W-36);
   ctx.restore();
 };
